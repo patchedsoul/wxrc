@@ -111,6 +111,37 @@ XrResult wxrc_create_xr_instance(XrInstance *instance) {
 	return r;
 }
 
+XrResult wxrc_get_xr_system(XrInstance instance, XrSystemId *sysid) {
+	/* XXX: Do we care about handheld devices? */
+	XrSystemGetInfo sysinfo = {
+		.type = XR_TYPE_SYSTEM_GET_INFO,
+		.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY,
+	};
+	XrResult r = xrGetSystem(instance, &sysinfo, sysid);
+	if (XR_FAILED(r)) {
+		wxrc_log_xr_result("xrGetSystem", r);
+		return r;
+	}
+
+	XrSystemProperties props = {XR_TYPE_SYSTEM_PROPERTIES};
+	xrGetSystemProperties(instance, *sysid, &props);
+	if (XR_FAILED(r)) {
+		return r;
+	}
+
+	wlr_log(WLR_DEBUG, "XR system %s; vendor ID: %d",
+			props.systemName, props.vendorId);
+	wlr_log(WLR_DEBUG, "\tmax swapchain size %dx%d:%d",
+			props.graphicsProperties.maxSwapchainImageWidth,
+			props.graphicsProperties.maxSwapchainImageHeight,
+			props.graphicsProperties.maxLayerCount);
+	wlr_log(WLR_DEBUG, "\torientation: %s; position: %s",
+			props.trackingProperties.orientationTracking ? "yes" : "no",
+			props.trackingProperties.positionTracking ? "yes" : "no");
+
+	return r;
+}
+
 int main(int argc, char *argv[]) {
 	wlr_log_init(WLR_DEBUG, NULL);
 	wlr_log(WLR_DEBUG, "Hello XR!");
@@ -123,6 +154,12 @@ int main(int argc, char *argv[]) {
 
 	XrInstance instance;
 	XrResult r = wxrc_create_xr_instance(&instance);
+	if (XR_FAILED(r)) {
+		return 1;
+	}
+
+	XrSystemId sysid;
+	r = wxrc_get_xr_system(instance, &sysid);
 	if (XR_FAILED(r)) {
 		return 1;
 	}
