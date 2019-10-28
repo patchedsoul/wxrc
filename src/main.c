@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include "xrutil.h"
 
-static XrResult xr_enumerate_layer_props(void) {
+static XrResult wxrc_xr_enumerate_layer_props(void) {
 	uint32_t nprops;
 	XrApiLayerProperties *props = NULL;
 	XrResult r = xrEnumerateApiLayerProperties(0, &nprops, NULL);
@@ -38,7 +38,7 @@ exit:
 	return r;
 }
 
-static XrResult xr_enumerate_instance_props(void) {
+static XrResult wxrc_xr_enumerate_instance_props(void) {
 	uint32_t nprops;
 	XrExtensionProperties *props = NULL;
 	XrResult r = xrEnumerateInstanceExtensionProperties(NULL, 0, &nprops, NULL);
@@ -144,11 +144,11 @@ XrResult wxrc_get_xr_system(XrInstance instance, XrSystemId *sysid) {
 
 int main(int argc, char *argv[]) {
 	wlr_log_init(WLR_DEBUG, NULL);
-	wlr_log(WLR_DEBUG, "Hello XR!");
-	if (XR_FAILED(xr_enumerate_layer_props())) {
+
+	if (XR_FAILED(wxrc_xr_enumerate_layer_props())) {
 		return 1;
 	}
-	if (XR_FAILED(xr_enumerate_instance_props())) {
+	if (XR_FAILED(wxrc_xr_enumerate_instance_props())) {
 		return 1;
 	}
 
