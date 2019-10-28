@@ -1,5 +1,6 @@
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
+#include <wayland-client.h>
 #include <wlr/util/log.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -142,6 +143,56 @@ XrResult wxrc_get_xr_system(XrInstance instance, XrSystemId *sysid) {
 	return r;
 }
 
+XrResult wxrc_create_xr_session(XrInstance instance,
+		XrSystemId sysid, XrSession *session) {
+	/* TODO: We need to be more sophisticated about how we go about setting up
+	 * the session's graphics binding */
+	struct wl_display *display = wl_display_connect(NULL);
+	if (!display) {
+		wlr_log(WLR_ERROR, "Unable to connect to Wayland display");
+		return XR_ERROR_INITIALIZATION_FAILED;
+	}
+
+	XrGraphicsRequirementsOpenGLKHR reqs =
+		{XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR};
+	XrResult r = xrGetOpenGLGraphicsRequirementsKHR(instance, sysid, &reqs);
+	if (XR_FAILED(r)) {
+		wxrc_log_xr_result("xrGetOpenGLGraphicsRequirementsKHR", r);
+		return r;
+	}
+
+	wlr_log(WLR_DEBUG, "OpenGL gfx requirements: min %d.%d.%d, max: %d.%d.%d",
+			XR_VERSION_MAJOR(reqs.minApiVersionSupported),
+			XR_VERSION_MINOR(reqs.minApiVersionSupported),
+			XR_VERSION_PATCH(reqs.minApiVersionSupported),
+			XR_VERSION_MAJOR(reqs.maxApiVersionSupported),
+			XR_VERSION_MINOR(reqs.maxApiVersionSupported),
+			XR_VERSION_PATCH(reqs.maxApiVersionSupported));
+
+	if (XR_VERSION_MAJOR(reqs.minApiVersionSupported) > 4 ||
+			XR_VERSION_MAJOR(reqs.maxApiVersionSupported) < 4) {
+		wlr_log(WLR_ERROR, "XR runtime does not support a suitable GL version.");
+		return XR_ERROR_INITIALIZATION_FAILED;
+	}
+
+	XrGraphicsBindingOpenGLWaylandKHR gfx = {
+		.display = display,
+	};
+
+	XrSessionCreateInfo sessinfo = {
+		.type = XR_TYPE_SESSION_CREATE_INFO,
+		.next = &gfx,
+		.createFlags = 0,
+		.systemId = sysid,
+	};
+
+	r = xrCreateSession(instance, &sessinfo, session);
+	if (XR_FAILED(r)) {
+		wxrc_log_xr_result("xrCreateSession", r);
+	}
+	return r;
+}
+
 int main(int argc, char *argv[]) {
 	wlr_log_init(WLR_DEBUG, NULL);
 
@@ -163,6 +214,9 @@ int main(int argc, char *argv[]) {
 	if (XR_FAILED(r)) {
 		return 1;
 	}
+
+	XrSession session;
+	r = wxrc_create_xr_session(instance, sysid, &session);
 
 	wlr_log(WLR_DEBUG, "Tearing down XR instance");
 	xrDestroyInstance(instance);

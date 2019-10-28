@@ -15,6 +15,7 @@ add_project_arguments(cc.get_supported_arguments([
 	'-DWLR_USE_UNSTABLE',
 
 	'-DXR_USE_GRAPHICS_API_OPENGL',
+	'-DXR_USE_PLATFORM_WAYLAND',
 
 	'-Wundef',
 	'-Wlogical-op',
@@ -36,6 +37,8 @@ add_project_arguments(cc.get_supported_arguments([
 openxr  = dependency('openxr')
 wlroots = dependency('wlroots')
 
+wayland_client = dependency('wayland-client')
+
 wxrc_inc = include_directories('include')
 
 executable('wxrc',
@@ -46,6 +49,7 @@ executable('wxrc',
 	dependencies: [
 		openxr,
 		wlroots,
+		wayland_client,
 	],
 	include_directories: wxrc_inc,
 	install: true,
