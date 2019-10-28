@@ -70,17 +70,7 @@ exit:
 	return r;
 }
 
-int main(int argc, char *argv[]) {
-	wlr_log_init(WLR_DEBUG, NULL);
-	wlr_log(WLR_DEBUG, "Hello XR!");
-	if (XR_FAILED(xr_enumerate_layer_props())) {
-		return 1;
-	}
-	if (XR_FAILED(xr_enumerate_instance_props())) {
-		return 1;
-	}
-
-	XrInstance instance;
+XrResult wxrc_create_xr_instance(XrInstance *instance) {
 	const char *extensions[] = {
 		XR_KHR_OPENGL_ENABLE_EXTENSION_NAME,
 	};
@@ -101,9 +91,39 @@ int main(int argc, char *argv[]) {
 		.enabledExtensionNames = extensions,
 	};
 	wlr_log(WLR_DEBUG, "Creating XR instance");
-	XrResult r = xrCreateInstance(&info, &instance);
+	XrResult r = xrCreateInstance(&info, instance);
 	if (XR_FAILED(r)) {
 		wxrc_log_xr_result("xrCreateInstance", r);
+		return r;
+	}
+
+	XrInstanceProperties iprops = {XR_TYPE_INSTANCE_PROPERTIES};
+	r = xrGetInstanceProperties(*instance, &iprops);
+	if (XR_FAILED(r)) {
+		wxrc_log_xr_result("xrGetInstanceProperties", r);
+		return r;
+	}
+	wlr_log(WLR_DEBUG, "XR runtime %s v%d.%d.%d",
+			iprops.runtimeName,
+			XR_VERSION_MAJOR(iprops.runtimeVersion),
+			XR_VERSION_MINOR(iprops.runtimeVersion),
+			XR_VERSION_PATCH(iprops.runtimeVersion));
+	return r;
+}
+
+int main(int argc, char *argv[]) {
+	wlr_log_init(WLR_DEBUG, NULL);
+	wlr_log(WLR_DEBUG, "Hello XR!");
+	if (XR_FAILED(xr_enumerate_layer_props())) {
+		return 1;
+	}
+	if (XR_FAILED(xr_enumerate_instance_props())) {
+		return 1;
+	}
+
+	XrInstance instance;
+	XrResult r = wxrc_create_xr_instance(&instance);
+	if (XR_FAILED(r)) {
 		return 1;
 	}
 
