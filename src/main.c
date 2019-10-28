@@ -176,6 +176,7 @@ XrResult wxrc_create_xr_session(XrInstance instance,
 	}
 
 	XrGraphicsBindingOpenGLWaylandKHR gfx = {
+		.type = XR_TYPE_GRAPHICS_BINDING_OPENGL_WAYLAND_KHR,
 		.display = display,
 	};
 
