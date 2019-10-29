@@ -1,3 +1,5 @@
+#include <EGL/egl.h>
+#include <GLES2/gl2.h>
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
 #include <wayland-client.h>
@@ -74,7 +76,8 @@ exit:
 
 XrResult wxrc_create_xr_instance(XrInstance *instance) {
 	const char *extensions[] = {
-		XR_KHR_OPENGL_ENABLE_EXTENSION_NAME,
+		XR_KHR_OPENGL_ES_ENABLE_EXTENSION_NAME,
+		XR_KHR_EGL_ENABLE_EXTENSION_NAME,
 	};
 	XrInstanceCreateInfo info = {
 		.type = XR_TYPE_INSTANCE_CREATE_INFO,
@@ -247,23 +250,24 @@ XrResult wxrc_create_xr_session(XrInstance instance,
 		return XR_ERROR_INITIALIZATION_FAILED;
 	}
 
-	PFN_xrGetOpenGLGraphicsRequirementsKHR xrGetOpenGLGraphicsRequirementsKHR;
-	XrResult r = xrGetInstanceProcAddr(instance, "xrGetOpenGLGraphicsRequirementsKHR",
-		(PFN_xrVoidFunction *)&xrGetOpenGLGraphicsRequirementsKHR);
+	PFN_xrGetOpenGLESGraphicsRequirementsKHR xrGetOpenGLESGraphicsRequirementsKHR;
+	XrResult r = xrGetInstanceProcAddr(instance, "xrGetOpenGLESGraphicsRequirementsKHR",
+		(PFN_xrVoidFunction *)&xrGetOpenGLESGraphicsRequirementsKHR);
 	if (XR_FAILED(r)) {
-		wxrc_log_xr_result("xrGetInstanceProcAddr", r);
+		wxrc_log_xr_result("xrGetInstanceProcAddr "
+			"(xrGetOpenGLESGraphicsRequirementsKHR)", r);
 		return r;
 	}
 
-	XrGraphicsRequirementsOpenGLKHR reqs =
-		{XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR};
-	r = xrGetOpenGLGraphicsRequirementsKHR(instance, sysid, &reqs);
+	XrGraphicsRequirementsOpenGLESKHR reqs =
+		{XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_ES_KHR};
+	r = xrGetOpenGLESGraphicsRequirementsKHR(instance, sysid, &reqs);
 	if (XR_FAILED(r)) {
-		wxrc_log_xr_result("xrGetOpenGLGraphicsRequirementsKHR", r);
+		wxrc_log_xr_result("xrGetOpenGLESGraphicsRequirementsKHR", r);
 		return r;
 	}
 
-	wlr_log(WLR_DEBUG, "OpenGL gfx requirements: min %d.%d.%d, max: %d.%d.%d",
+	wlr_log(WLR_DEBUG, "OpenGL ES gfx requirements: min %d.%d.%d, max: %d.%d.%d",
 			XR_VERSION_MAJOR(reqs.minApiVersionSupported),
 			XR_VERSION_MINOR(reqs.minApiVersionSupported),
 			XR_VERSION_PATCH(reqs.minApiVersionSupported),
@@ -271,15 +275,15 @@ XrResult wxrc_create_xr_session(XrInstance instance,
 			XR_VERSION_MINOR(reqs.maxApiVersionSupported),
 			XR_VERSION_PATCH(reqs.maxApiVersionSupported));
 
-	if (XR_VERSION_MAJOR(reqs.minApiVersionSupported) > 4 ||
-			XR_VERSION_MAJOR(reqs.maxApiVersionSupported) < 4) {
+	if (XR_VERSION_MAJOR(reqs.minApiVersionSupported) > 2 ||
+			XR_VERSION_MAJOR(reqs.maxApiVersionSupported) < 2) {
 		wlr_log(WLR_ERROR, "XR runtime does not support a suitable GL version.");
 		return XR_ERROR_INITIALIZATION_FAILED;
 	}
 
-	XrGraphicsBindingOpenGLWaylandKHR gfx = {
-		.type = XR_TYPE_GRAPHICS_BINDING_OPENGL_WAYLAND_KHR,
-		.display = display,
+	XrGraphicsBindingEGLKHR gfx = {
+		.type = XR_TYPE_GRAPHICS_BINDING_EGL_KHR,
+		/* TODO */
 	};
 
 	XrSessionCreateInfo sessinfo = {

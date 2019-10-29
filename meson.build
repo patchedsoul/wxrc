@@ -14,8 +14,8 @@ cc = meson.get_compiler('c')
 add_project_arguments(cc.get_supported_arguments([
 	'-DWLR_USE_UNSTABLE',
 
-	'-DXR_USE_GRAPHICS_API_OPENGL',
-	'-DXR_USE_PLATFORM_WAYLAND',
+	'-DXR_USE_GRAPHICS_API_OPENGL_ES',
+	'-DXR_USE_PLATFORM_EGL',
 
 	'-Wundef',
 	'-Wlogical-op',
@@ -34,7 +34,9 @@ add_project_arguments(cc.get_supported_arguments([
 	'-Wno-unused-parameter',
 ]), language: 'c')
 
-openxr  = dependency('openxr')
+egl = dependency('egl')
+glesv2 = dependency('glesv2')
+openxr = dependency('openxr')
 wlroots = dependency('wlroots', version: ['>=0.8.1', '<0.9.0'], fallback: ['wlroots', 'wlroots'])
 
 wayland_client = dependency('wayland-client')
@@ -47,6 +49,8 @@ executable('wxrc',
 		'src/xrutil.c',
 	),
 	dependencies: [
+		egl,
+		glesv2,
 		openxr,
 		wlroots,
 		wayland_client,
