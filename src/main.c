@@ -30,7 +30,7 @@ static XrResult wxrc_xr_enumerate_layer_props(void) {
 	for (uint32_t i = 0; i < nprops; ++i) {
 		XrApiLayerProperties *prop = &props[i];
 		wlr_log(WLR_DEBUG, "%s: spec version %d; layer version %d; %s",
-				prop->layerName, prop->specVersion, prop->layerVersion,
+				prop->layerName, (int)prop->specVersion, prop->layerVersion,
 				prop->description);
 	}
 
