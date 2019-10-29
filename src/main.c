@@ -153,9 +153,17 @@ XrResult wxrc_create_xr_session(XrInstance instance,
 		return XR_ERROR_INITIALIZATION_FAILED;
 	}
 
+	PFN_xrGetOpenGLGraphicsRequirementsKHR xrGetOpenGLGraphicsRequirementsKHR;
+	XrResult r = xrGetInstanceProcAddr(instance, "xrGetOpenGLGraphicsRequirementsKHR",
+		(PFN_xrVoidFunction *)&xrGetOpenGLGraphicsRequirementsKHR);
+	if (XR_FAILED(r)) {
+		wxrc_log_xr_result("xrGetInstanceProcAddr", r);
+		return r;
+	}
+
 	XrGraphicsRequirementsOpenGLKHR reqs =
 		{XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR};
-	XrResult r = xrGetOpenGLGraphicsRequirementsKHR(instance, sysid, &reqs);
+	r = xrGetOpenGLGraphicsRequirementsKHR(instance, sysid, &reqs);
 	if (XR_FAILED(r)) {
 		wxrc_log_xr_result("xrGetOpenGLGraphicsRequirementsKHR", r);
 		return r;
