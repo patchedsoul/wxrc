@@ -40,6 +40,7 @@ openxr = dependency('openxr')
 wlroots = dependency('wlroots', version: ['>=0.8.1', '<0.9.0'], fallback: ['wlroots', 'wlroots'])
 
 wayland_client = dependency('wayland-client')
+wayland_egl = dependency('wayland-egl')
 
 wxrc_inc = include_directories('include')
 
@@ -54,6 +55,7 @@ executable('wxrc',
 		openxr,
 		wlroots,
 		wayland_client,
+		wayland_egl,
 	],
 	include_directories: wxrc_inc,
 	install: true,

@@ -3,6 +3,7 @@
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
 #include <wayland-client.h>
+#include <wayland-egl.h>
 #include <wlr/util/log.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -250,6 +251,46 @@ XrResult wxrc_create_xr_session(XrInstance instance,
 		return XR_ERROR_INITIALIZATION_FAILED;
 	}
 
+	EGLDisplay egl_display = eglGetDisplay((EGLNativeDisplayType)display);
+	if (egl_display == EGL_NO_DISPLAY) {
+		wlr_log(WLR_ERROR, "eglGetDisplay failed");
+		return XR_ERROR_INITIALIZATION_FAILED;
+	}
+
+	EGLint egl_major, egl_minor;
+	if (!eglInitialize(egl_display, &egl_major, &egl_minor)) {
+		wlr_log(WLR_ERROR, "eglInitialize failed");
+		return XR_ERROR_INITIALIZATION_FAILED;
+	}
+
+	EGLint egl_config_attribs[] = {
+		EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
+		EGL_RED_SIZE, 8,
+		EGL_GREEN_SIZE, 8,
+		EGL_BLUE_SIZE, 8,
+		EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+		EGL_NONE,
+	};
+	EGLint egl_n_configs = 0;
+	EGLConfig egl_config;
+	eglChooseConfig(egl_display, egl_config_attribs, &egl_config, 1,
+		&egl_n_configs);
+	if (egl_n_configs == 0) {
+		wlr_log(WLR_ERROR, "eglChooseConfig failed");
+		return XR_ERROR_INITIALIZATION_FAILED;
+	}
+
+	GLint egl_context_attribs[] = {
+		EGL_CONTEXT_CLIENT_VERSION, 2,
+		EGL_NONE,
+	};
+	EGLContext egl_context = eglCreateContext(egl_display, egl_config,
+		EGL_NO_CONTEXT, egl_context_attribs);
+	if (egl_context == EGL_NO_CONTEXT) {
+		wlr_log(WLR_ERROR, "eglCreateContext failed");
+		return XR_ERROR_INITIALIZATION_FAILED;
+	}
+
 	PFN_xrGetOpenGLESGraphicsRequirementsKHR xrGetOpenGLESGraphicsRequirementsKHR;
 	XrResult r = xrGetInstanceProcAddr(instance, "xrGetOpenGLESGraphicsRequirementsKHR",
 		(PFN_xrVoidFunction *)&xrGetOpenGLESGraphicsRequirementsKHR);
@@ -283,7 +324,10 @@ XrResult wxrc_create_xr_session(XrInstance instance,
 
 	XrGraphicsBindingEGLKHR gfx = {
 		.type = XR_TYPE_GRAPHICS_BINDING_EGL_KHR,
-		/* TODO */
+		.getProcAddress = eglGetProcAddress,
+		.display = egl_display,
+		.config = egl_config,
+		.context = egl_context,
 	};
 
 	XrSessionCreateInfo sessinfo = {
