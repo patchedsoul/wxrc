@@ -226,6 +226,9 @@ int main(int argc, char *argv[]) {
 
 	XrSession session;
 	r = wxrc_create_xr_session(instance, sysid, &session);
+	if (XR_FAILED(r)) {
+		return 1;
+	}
 
 	wlr_log(WLR_DEBUG, "Tearing down XR instance");
 	xrDestroyInstance(instance);
