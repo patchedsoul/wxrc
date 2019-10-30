@@ -143,6 +143,60 @@ XrResult wxrc_get_xr_system(XrInstance instance, XrSystemId *sysid) {
 	return r;
 }
 
+static XrResult wxrc_xr_enumerate_view_configs(XrInstance instance,
+		XrSystemId sysid) {
+	uint32_t nconfigs;
+	XrResult r =
+		xrEnumerateViewConfigurations(instance, sysid, 0, &nconfigs, NULL);
+	if (XR_FAILED(r)) {
+		wxrc_log_xr_result("xrEnumerateViewConfigurations", r);
+		return r;
+	}
+
+	XrViewConfigurationType *configs =
+		calloc(nconfigs, sizeof(XrViewConfigurationType));
+	if (configs == NULL) {
+		wlr_log_errno(WLR_ERROR, "calloc failed");
+		return XR_ERROR_OUT_OF_MEMORY;
+	}
+	r = xrEnumerateViewConfigurations(instance, sysid, nconfigs,
+		&nconfigs, configs);
+	if (XR_FAILED(r)) {
+		wxrc_log_xr_result("xrEnumerateViewConfigurations", r);
+		goto exit;
+	}
+
+	bool found = false;
+	for (size_t i = 0; i < nconfigs; i++) {
+		if (configs[i] == XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO) {
+			found = true;
+			break;
+		}
+	}
+	if (!found) {
+		wlr_log(WLR_ERROR, "OpenXR system doesn't support stereo view config");
+		return XR_ERROR_INITIALIZATION_FAILED;
+	}
+
+	XrViewConfigurationProperties stereo_props = {
+		.type = XR_TYPE_VIEW_CONFIGURATION_PROPERTIES,
+		.next = NULL,
+	};
+	r = xrGetViewConfigurationProperties(instance, sysid,
+		XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, &stereo_props);
+	if (XR_FAILED(r)) {
+		wxrc_log_xr_result("xrGetViewConfigurationProperties", r);
+		goto exit;
+	}
+
+	wlr_log(WLR_DEBUG, "OpenXR stereo view config: FOV %s",
+		stereo_props.fovMutable ? "mutable" : "immutable");
+
+exit:
+	free(configs);
+	return r;
+}
+
 XrResult wxrc_create_xr_session(XrInstance instance,
 		XrSystemId sysid, XrSession *session) {
 	/* TODO: We need to be more sophisticated about how we go about setting up
@@ -221,6 +275,10 @@ int main(int argc, char *argv[]) {
 	XrSystemId sysid;
 	r = wxrc_get_xr_system(instance, &sysid);
 	if (XR_FAILED(r)) {
+		return 1;
+	}
+
+	if (XR_FAILED(wxrc_xr_enumerate_view_configs(instance, sysid))) {
 		return 1;
 	}
 
