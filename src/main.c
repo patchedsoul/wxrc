@@ -369,7 +369,7 @@ XrResult wxrc_xr_create_local_reference_space(XrSession session,
 }
 
 struct wxrc_xr_view *wxrc_xr_create_swapchains(XrSession session,
-		uint32_t nviews, XrViewConfigurationView *xr_views) {
+		uint32_t nviews, XrViewConfigurationView *view_configs) {
 	uint32_t nformats;
 	XrResult r = xrEnumerateSwapchainFormats(session, 0, &nformats, NULL);
 	if (XR_FAILED(r)) {
@@ -402,7 +402,7 @@ struct wxrc_xr_view *wxrc_xr_create_swapchains(XrSession session,
 	}
 
 	for (uint32_t i = 0; i < nviews; i++) {
-		views[i].view = xr_views[i];
+		views[i].config = view_configs[i];
 
 		XrSwapchainCreateInfo create_info = {
 			.type = XR_TYPE_SWAPCHAIN_CREATE_INFO,
@@ -411,8 +411,8 @@ struct wxrc_xr_view *wxrc_xr_create_swapchains(XrSession session,
 			.createFlags = 0,
 			.format = format,
 			.sampleCount = 1,
-			.width = views[i].view.recommendedImageRectWidth,
-			.height = views[i].view.recommendedImageRectHeight,
+			.width = views[i].config.recommendedImageRectWidth,
+			.height = views[i].config.recommendedImageRectHeight,
 			.faceCount = 1,
 			.arraySize = 1,
 			.mipCount = 1,
@@ -470,6 +470,22 @@ error:
 	return NULL;
 }
 
+static void render_xr_view(struct wxrc_xr_view *view, GLuint framebuffer,
+		XrSwapchainImageOpenGLESKHR *image) {
+	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+
+	glViewport(0, 0, view->config.recommendedImageRectWidth,
+		view->config.recommendedImageRectHeight);
+
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+		image->image, 0);
+
+	glClearColor(0.0, 0.0, 1.0, 1.0);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
 int main(int argc, char *argv[]) {
 	wlr_log_init(WLR_DEBUG, NULL);
 
@@ -497,9 +513,9 @@ int main(int argc, char *argv[]) {
 	}
 
 	uint32_t nviews;
-	XrViewConfigurationView *xr_views =
+	XrViewConfigurationView *view_configs =
 		wxrc_xr_enumerate_stereo_config_views(instance, sysid, &nviews);
-	if (xr_views == NULL) {
+	if (view_configs == NULL) {
 		return 1;
 	}
 
@@ -532,14 +548,144 @@ int main(int argc, char *argv[]) {
 	}
 
 	struct wxrc_xr_view *views =
-		wxrc_xr_create_swapchains(session, nviews, xr_views);
+		wxrc_xr_create_swapchains(session, nviews, view_configs);
 	if (views == NULL) {
 		return 1;
 	}
 
+	XrView *xr_views = calloc(nviews, sizeof(XrView));
+	XrCompositionLayerProjectionView *projection_views =
+		calloc(nviews, sizeof(XrCompositionLayerProjectionView));
+	while (1) {
+		XrFrameWaitInfo frame_wait_info = {
+			.type = XR_TYPE_FRAME_WAIT_INFO,
+			.next = NULL,
+		};
+		XrFrameState frame_state = {
+			.type = XR_TYPE_FRAME_STATE,
+			.next = NULL,
+		};
+		r = xrWaitFrame(session, &frame_wait_info, &frame_state);
+		if (XR_FAILED(r)) {
+			wxrc_log_xr_result("xrWaitFrame", r);
+			return 1;
+		}
+
+		for (uint32_t i = 0; i < nviews; i++) {
+			xr_views[i].type = XR_TYPE_VIEW;
+			xr_views[i].next = NULL;
+		}
+
+		XrViewLocateInfo view_locate_info = {
+			.type = XR_TYPE_VIEW_LOCATE_INFO,
+			.displayTime = frame_state.predictedDisplayTime,
+			.space = local_space,
+		};
+		XrViewState view_state = {
+			.type = XR_TYPE_VIEW_STATE,
+			.next = NULL,
+		};
+		r = xrLocateViews(session, &view_locate_info, &view_state, nviews,
+			&nviews, xr_views);
+		if (XR_FAILED(r)) {
+			wxrc_log_xr_result("xrLocateViews", r);
+			return 1;
+		}
+
+		XrFrameBeginInfo frame_begin_info = {
+			.type = XR_TYPE_FRAME_BEGIN_INFO,
+			.next = NULL,
+		};
+		r = xrBeginFrame(session, &frame_begin_info);
+		if (XR_FAILED(r)) {
+			wxrc_log_xr_result("xrBeginFrame", r);
+			return 1;
+		}
+
+		for (uint32_t i = 0; i < nviews; i++) {
+			struct wxrc_xr_view *view = &views[i];
+
+			XrSwapchainImageAcquireInfo swapchain_image_acquire_info = {
+				.type = XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO,
+				.next = NULL,
+			};
+			uint32_t buffer_index;
+			r = xrAcquireSwapchainImage(view->swapchain,
+				&swapchain_image_acquire_info, &buffer_index);
+			if (XR_FAILED(r)) {
+				wxrc_log_xr_result("xrAcquireSwapchainImage", r);
+				return 1;
+			}
+
+			XrSwapchainImageWaitInfo swapchain_wait_info = {
+				.type = XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO,
+				.next = NULL,
+				.timeout = 1000,
+			};
+			r = xrWaitSwapchainImage(view->swapchain, &swapchain_wait_info);
+			if (XR_FAILED(r)) {
+				wxrc_log_xr_result("xrWaitSwapchainImage", r);
+				return 1;
+			}
+
+			projection_views[i].type = XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW;
+			projection_views[i].next = NULL;
+			projection_views[i].pose = xr_views[i].pose;
+			projection_views[i].fov = xr_views[i].fov;
+			projection_views[i].subImage.swapchain = view->swapchain;
+			projection_views[i].subImage.imageArrayIndex = buffer_index;
+			projection_views[i].subImage.imageRect.offset.x = 0;
+			projection_views[i].subImage.imageRect.offset.y = 0;
+			projection_views[i].subImage.imageRect.extent.width =
+				view->config.recommendedImageRectWidth;
+			projection_views[i].subImage.imageRect.extent.height =
+				view->config.recommendedImageRectHeight;
+
+			render_xr_view(view, view->framebuffers[buffer_index],
+				&view->images[buffer_index]);
+
+			XrSwapchainImageReleaseInfo swapchain_release_info = {
+				.type = XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO,
+				.next = NULL,
+			};
+			r = xrReleaseSwapchainImage(view->swapchain, &swapchain_release_info);
+			if (XR_FAILED(r)) {
+				wxrc_log_xr_result("xrReleaseSwapchainImage", r);
+				return 1;
+			}
+		}
+
+		XrCompositionLayerProjection projection_layer = {
+			.type = XR_TYPE_COMPOSITION_LAYER_PROJECTION,
+			.next = NULL,
+			.layerFlags = 0,
+			.space = local_space,
+			.viewCount = nviews,
+			.views = projection_views,
+		};
+		const XrCompositionLayerBaseHeader *projection_layers[] = {
+			(XrCompositionLayerBaseHeader *)&projection_layer,
+		};
+		XrFrameEndInfo frame_end_info = {
+			.type = XR_TYPE_FRAME_END_INFO,
+			.displayTime = frame_state.predictedDisplayTime,
+			.layerCount = 1,
+			.layers = projection_layers,
+			.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE,
+			.next = NULL,
+		};
+		r = xrEndFrame(session, &frame_end_info);
+		if (XR_FAILED(r)) {
+			wxrc_log_xr_result("xrEndFrame", r);
+			return 1;
+		}
+	}
+
 	wlr_log(WLR_DEBUG, "Tearing down XR instance");
-	free(views);
+	free(projection_views);
 	free(xr_views);
+	free(views);
+	free(view_configs);
 	xrDestroyInstance(instance);
 	return 0;
 }

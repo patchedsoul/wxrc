@@ -5,7 +5,7 @@
 #include <openxr/openxr.h>
 
 struct wxrc_xr_view {
-	XrViewConfigurationView view;
+	XrViewConfigurationView config;
 	XrSwapchain swapchain;
 
 	uint32_t nimages;
