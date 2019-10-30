@@ -348,6 +348,25 @@ exit:
 	return r;
 }
 
+XrResult wxrc_xr_create_local_reference_space(XrSession session,
+		XrSpace *space) {
+	XrPosef identity_pose = {
+		.orientation = { .x = 0, .y = 0, .z = 0, .w = 1 },
+		.position = { .x = 0, .y = 0, .z = 0 },
+	};
+	XrReferenceSpaceCreateInfo create_info = {
+		.type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO,
+		.next = NULL,
+		.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_LOCAL,
+		.poseInReferenceSpace = identity_pose,
+	};
+	XrResult r = xrCreateReferenceSpace(session, &create_info, space);
+	if (XR_FAILED(r)) {
+		wxrc_log_xr_result("xrCreateReferenceSpace", r);
+	}
+	return r;
+}
+
 int main(int argc, char *argv[]) {
 	wlr_log_init(WLR_DEBUG, NULL);
 
@@ -388,6 +407,24 @@ int main(int argc, char *argv[]) {
 	}
 
 	if (XR_FAILED(wxrc_xr_enumerate_reference_spaces(session))) {
+		return 1;
+	}
+
+	XrSpace local_space;
+	r = wxrc_xr_create_local_reference_space(session, &local_space);
+	if (XR_FAILED(r)) {
+		return 1;
+	}
+
+	wlr_log(WLR_DEBUG, "Starting XR session");
+	XrSessionBeginInfo session_begin_info = {
+		.type = XR_TYPE_SESSION_BEGIN_INFO,
+		.next = NULL,
+		.primaryViewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
+	};
+	r = xrBeginSession(session, &session_begin_info);
+	if (XR_FAILED(r)) {
+		wxrc_log_xr_result("xrBeginSession", r);
 		return 1;
 	}
 
