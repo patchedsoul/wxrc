@@ -4,6 +4,7 @@
 #include <wlr/util/log.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "xr.h"
 #include "xrutil.h"
 
 static XrResult wxrc_xr_enumerate_layer_props(void) {
@@ -367,6 +368,108 @@ XrResult wxrc_xr_create_local_reference_space(XrSession session,
 	return r;
 }
 
+struct wxrc_xr_view *wxrc_xr_create_swapchains(XrSession session,
+		uint32_t nviews, XrViewConfigurationView *xr_views) {
+	uint32_t nformats;
+	XrResult r = xrEnumerateSwapchainFormats(session, 0, &nformats, NULL);
+	if (XR_FAILED(r)) {
+		wxrc_log_xr_result("xrEnumerateSwapchainFormats", r);
+		return NULL;
+	}
+
+	int64_t *formats = calloc(nformats, sizeof(int64_t));
+	if (formats == NULL) {
+		wlr_log_errno(WLR_ERROR, "calloc failed");
+		return NULL;
+	}
+	r = xrEnumerateSwapchainFormats(session, nformats, &nformats, formats);
+	if (XR_FAILED(r)) {
+		wxrc_log_xr_result("xrEnumerateSwapchainFormats", r);
+		free(formats);
+		return NULL;
+	}
+
+	int64_t format = formats[0];
+	wlr_log(WLR_DEBUG, "XR runtime supports %d swapchain formats, "
+		"picking format %" PRIi64, nformats, format);
+
+	free(formats);
+
+	struct wxrc_xr_view *views = calloc(nviews, sizeof(struct wxrc_xr_view));
+	if (views == NULL) {
+		wlr_log_errno(WLR_ERROR, "calloc failed");
+		return NULL;
+	}
+
+	for (uint32_t i = 0; i < nviews; i++) {
+		views[i].view = xr_views[i];
+
+		XrSwapchainCreateInfo create_info = {
+			.type = XR_TYPE_SWAPCHAIN_CREATE_INFO,
+			.usageFlags = XR_SWAPCHAIN_USAGE_SAMPLED_BIT |
+				XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT,
+			.createFlags = 0,
+			.format = format,
+			.sampleCount = 1,
+			.width = views[i].view.recommendedImageRectWidth,
+			.height = views[i].view.recommendedImageRectHeight,
+			.faceCount = 1,
+			.arraySize = 1,
+			.mipCount = 1,
+			.next = NULL,
+		};
+		r = xrCreateSwapchain(session, &create_info, &views[i].swapchain);
+		if (XR_FAILED(r)) {
+			wxrc_log_xr_result("xrCreateSwapchain", r);
+			goto error;
+		}
+	}
+
+	for (uint32_t i = 0; i < nviews; i++) {
+		struct wxrc_xr_view *view = &views[i];
+		r = xrEnumerateSwapchainImages(view->swapchain, 0,
+			&view->nimages, NULL);
+		if (XR_FAILED(r)) {
+			wxrc_log_xr_result("xrEnumerateSwapchainImages", r);
+			goto error;
+		}
+
+		view->images =
+			calloc(view->nimages, sizeof(XrSwapchainImageOpenGLESKHR));
+		if (view->images == NULL) {
+			wlr_log_errno(WLR_ERROR, "calloc failed");
+			r = XR_ERROR_OUT_OF_MEMORY;
+			goto error;
+		}
+		for (uint32_t j = 0; j < view->nimages; j++) {
+			view->images[j].type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_ES_KHR;
+			view->images[j].next = NULL;
+		}
+		r = xrEnumerateSwapchainImages(view->swapchain, view->nimages,
+			&view->nimages, (XrSwapchainImageBaseHeader *)view->images);
+		if (XR_FAILED(r)) {
+			wxrc_log_xr_result("xrEnumerateSwapchainImages", r);
+			free(view->images);
+			goto error;
+		}
+
+		view->framebuffers = calloc(view->nimages, sizeof(GLuint));
+		if (view->framebuffers == NULL) {
+			wlr_log_errno(WLR_ERROR, "calloc failed");
+			r = XR_ERROR_OUT_OF_MEMORY;
+			goto error;
+		}
+
+		glGenFramebuffers(view->nimages, view->framebuffers);
+	}
+
+	return views;
+
+error:
+	free(views);
+	return NULL;
+}
+
 int main(int argc, char *argv[]) {
 	wlr_log_init(WLR_DEBUG, NULL);
 
@@ -394,9 +497,9 @@ int main(int argc, char *argv[]) {
 	}
 
 	uint32_t nviews;
-	XrViewConfigurationView *views =
+	XrViewConfigurationView *xr_views =
 		wxrc_xr_enumerate_stereo_config_views(instance, sysid, &nviews);
-	if (views == NULL) {
+	if (xr_views == NULL) {
 		return 1;
 	}
 
@@ -428,8 +531,15 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
+	struct wxrc_xr_view *views =
+		wxrc_xr_create_swapchains(session, nviews, xr_views);
+	if (views == NULL) {
+		return 1;
+	}
+
 	wlr_log(WLR_DEBUG, "Tearing down XR instance");
 	free(views);
+	free(xr_views);
 	xrDestroyInstance(instance);
 	return 0;
 }
