@@ -62,7 +62,7 @@ static XrResult wxrc_xr_enumerate_instance_props(void) {
 
 	for (uint32_t i = 0; i < nprops; ++i) {
 		XrExtensionProperties *prop = &props[i];
-		wlr_log(WLR_DEBUG, "%s v%d", prop->extensionName,
+		wlr_log(WLR_DEBUG, "\t%s v%d", prop->extensionName,
 				prop->extensionVersion);
 	}
 
@@ -197,6 +197,45 @@ exit:
 	return r;
 }
 
+XrViewConfigurationView *wxrc_xr_enumerate_stereo_config_views(
+		XrInstance instance, XrSystemId sysid, uint32_t *nviews) {
+	XrResult r = xrEnumerateViewConfigurationViews(instance, sysid,
+		XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, 0, nviews, NULL);
+	if (XR_FAILED(r)) {
+		wxrc_log_xr_result("xrEnumerateViewConfigurationViews", r);
+		return NULL;
+	}
+
+	XrViewConfigurationView *views =
+		calloc(*nviews, sizeof(XrViewConfigurationView));
+	if (views == NULL) {
+		wlr_log_errno(WLR_ERROR, "calloc failed");
+		return NULL;
+	}
+	r = xrEnumerateViewConfigurationViews(instance, sysid,
+		XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, *nviews, nviews, views);
+	if (XR_FAILED(r)) {
+		wxrc_log_xr_result("xrEnumerateViewConfigurationViews", r);
+		free(views);
+		return NULL;
+	}
+
+	wlr_log(WLR_DEBUG, "Stereo views (%d):", *nviews);
+	for (size_t i = 0; i < *nviews; i++) {
+		wlr_log(WLR_DEBUG, "\t%zu: recommended resolution %xx%d, "
+			"max resolution %dx%d, recommended swapchain samples %d, "
+			"max swapchain samples %d",
+			i,
+			views[i].recommendedImageRectWidth,
+			views[i].recommendedImageRectHeight,
+			views[i].maxImageRectWidth, views[i].maxImageRectHeight,
+			views[i].recommendedSwapchainSampleCount,
+			views[i].maxSwapchainSampleCount);
+	}
+
+	return views;
+}
+
 XrResult wxrc_create_xr_session(XrInstance instance,
 		XrSystemId sysid, XrSession *session) {
 	/* TODO: We need to be more sophisticated about how we go about setting up
@@ -282,6 +321,13 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
+	uint32_t nviews;
+	XrViewConfigurationView *views =
+		wxrc_xr_enumerate_stereo_config_views(instance, sysid, &nviews);
+	if (views == NULL) {
+		return 1;
+	}
+
 	XrSession session;
 	r = wxrc_create_xr_session(instance, sysid, &session);
 	if (XR_FAILED(r)) {
@@ -289,6 +335,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	wlr_log(WLR_DEBUG, "Tearing down XR instance");
+	free(views);
 	xrDestroyInstance(instance);
 	return 0;
 }
