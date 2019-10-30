@@ -295,6 +295,59 @@ XrResult wxrc_create_xr_session(XrInstance instance,
 	return r;
 }
 
+XrResult wxrc_xr_enumerate_reference_spaces(XrSession session) {
+	uint32_t nspaces;
+	XrResult r = xrEnumerateReferenceSpaces(session, 0, &nspaces, NULL);
+	if (XR_FAILED(r)) {
+		wxrc_log_xr_result("xrEnumerateReferenceSpaces", r);
+		return r;
+	}
+
+	XrReferenceSpaceType *spaces = calloc(nspaces, sizeof(XrReferenceSpaceType));
+	if (spaces == NULL) {
+		wlr_log_errno(WLR_ERROR, "calloc failed");
+		return XR_ERROR_OUT_OF_MEMORY;
+	}
+
+	r = xrEnumerateReferenceSpaces(session, nspaces, &nspaces, spaces);
+	if (XR_FAILED(r)) {
+		wxrc_log_xr_result("xrEnumerateReferenceSpaces", r);
+		goto exit;
+	}
+
+	wlr_log(WLR_DEBUG, "OpenXR reference spaces (%d):", nspaces);
+	bool has_local = false;
+	for (uint32_t i = 0; i < nspaces; i++) {
+		const char *name;
+		switch (spaces[i]) {
+		case XR_REFERENCE_SPACE_TYPE_LOCAL:
+			name = "local";
+			has_local = true;
+			break;
+		case XR_REFERENCE_SPACE_TYPE_STAGE:
+			name = "stage";
+			break;
+		case XR_REFERENCE_SPACE_TYPE_VIEW:
+			name = "view";
+			break;
+		default:
+			name = NULL;
+		}
+		if (name == NULL) {
+			continue;
+		}
+		wlr_log(WLR_DEBUG, "\t%s", name);
+	}
+
+	if (!has_local) {
+		wlr_log(WLR_ERROR, "Local reference space not supported");
+		r = XR_ERROR_INITIALIZATION_FAILED;
+	}
+exit:
+	free(spaces);
+	return r;
+}
+
 int main(int argc, char *argv[]) {
 	wlr_log_init(WLR_DEBUG, NULL);
 
@@ -331,6 +384,10 @@ int main(int argc, char *argv[]) {
 	XrSession session;
 	r = wxrc_create_xr_session(instance, sysid, &session);
 	if (XR_FAILED(r)) {
+		return 1;
+	}
+
+	if (XR_FAILED(wxrc_xr_enumerate_reference_spaces(session))) {
 		return 1;
 	}
 
