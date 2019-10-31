@@ -610,7 +610,8 @@ int main(int argc, char *argv[]) {
 	XrView *xr_views = calloc(nviews, sizeof(XrView));
 	XrCompositionLayerProjectionView *projection_views =
 		calloc(nviews, sizeof(XrCompositionLayerProjectionView));
-	while (1) {
+	bool running = true;
+	while (running) {
 		XrFrameWaitInfo frame_wait_info = {
 			.type = XR_TYPE_FRAME_WAIT_INFO,
 			.next = NULL,
@@ -623,6 +624,40 @@ int main(int argc, char *argv[]) {
 		if (XR_FAILED(r)) {
 			wxrc_log_xr_result("xrWaitFrame", r);
 			return 1;
+		}
+
+		XrEventDataBuffer event = {
+			.type = XR_TYPE_EVENT_DATA_BUFFER,
+			.next = NULL,
+		};
+		r = xrPollEvent(instance, &event);
+		if (r != XR_EVENT_UNAVAILABLE) {
+			if (XR_FAILED(r)) {
+				wxrc_log_xr_result("xrPollEvent", r);
+				return 1;
+			}
+			switch (event.type) {
+			case XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING:
+				running = false;
+				break;
+			case XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED:;
+				XrEventDataSessionStateChanged *state_change_event =
+					(XrEventDataSessionStateChanged *)&event;
+				switch (state_change_event->state) {
+				case XR_SESSION_STATE_STOPPING:
+				case XR_SESSION_STATE_LOSS_PENDING:
+				case XR_SESSION_STATE_EXITING:
+					running = false;
+					break;
+				default:
+					break;
+				}
+			default:
+				break;
+			}
+		}
+		if (!running) {
+			break;
 		}
 
 		for (uint32_t i = 0; i < nviews; i++) {
