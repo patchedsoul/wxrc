@@ -588,6 +588,28 @@ static XrResult wxrc_xr_push_view_frame(struct wxrc_xr_view *view,
 	return r;
 }
 
+static void wxrc_xr_handle_event(XrEventDataBuffer *event, bool *running) {
+	switch (event->type) {
+	case XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING:
+		*running = false;
+		break;
+	case XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED:;
+		XrEventDataSessionStateChanged *state_change_event =
+			(XrEventDataSessionStateChanged *)event;
+		switch (state_change_event->state) {
+		case XR_SESSION_STATE_STOPPING:
+		case XR_SESSION_STATE_LOSS_PENDING:
+		case XR_SESSION_STATE_EXITING:
+			*running = false;
+			break;
+		default:
+			break;
+		}
+	default:
+		break;
+	}
+}
+
 int main(int argc, char *argv[]) {
 	wlr_log_init(WLR_DEBUG, NULL);
 
@@ -684,25 +706,7 @@ int main(int argc, char *argv[]) {
 				wxrc_log_xr_result("xrPollEvent", r);
 				return 1;
 			}
-			switch (event.type) {
-			case XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING:
-				running = false;
-				break;
-			case XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED:;
-				XrEventDataSessionStateChanged *state_change_event =
-					(XrEventDataSessionStateChanged *)&event;
-				switch (state_change_event->state) {
-				case XR_SESSION_STATE_STOPPING:
-				case XR_SESSION_STATE_LOSS_PENDING:
-				case XR_SESSION_STATE_EXITING:
-					running = false;
-					break;
-				default:
-					break;
-				}
-			default:
-				break;
-			}
+			wxrc_xr_handle_event(&event, &running);
 		}
 		if (!running) {
 			break;
