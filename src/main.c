@@ -1,9 +1,11 @@
+#define _POSIX_C_SOURCE 200112L
 #include <EGL/egl.h>
 #include <GLES2/gl2.h>
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
 #include <wayland-client.h>
 #include <wayland-egl.h>
+#include <wayland-server.h>
 #include <wlr/util/log.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -613,6 +615,13 @@ static void wxrc_xr_handle_event(XrEventDataBuffer *event, bool *running) {
 int main(int argc, char *argv[]) {
 	wlr_log_init(WLR_DEBUG, NULL);
 
+	struct wl_display *wl_display = wl_display_create();
+	if (wl_display == NULL) {
+		wlr_log(WLR_ERROR, "wl_display_create failed");
+		return 1;
+	}
+	struct wl_event_loop *wl_event_loop = wl_display_get_event_loop(wl_display);
+
 	if (XR_FAILED(wxrc_xr_enumerate_layer_props())) {
 		return 1;
 	}
@@ -677,6 +686,14 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
+	const char *wl_socket = wl_display_add_socket_auto(wl_display);
+	if (wl_socket == NULL) {
+		wlr_log(WLR_ERROR, "wl_display_add_socket_auto failed");
+		return 1;
+	}
+	wlr_log(WLR_DEBUG, "Wayland compositor listening on %s", wl_socket);
+
+	wlr_log(WLR_DEBUG, "Starting XR main loop");
 	XrView *xr_views = calloc(nviews, sizeof(XrView));
 	XrCompositionLayerProjectionView *projection_views =
 		calloc(nviews, sizeof(XrCompositionLayerProjectionView));
@@ -708,6 +725,14 @@ int main(int argc, char *argv[]) {
 			}
 			wxrc_xr_handle_event(&event, &running);
 		}
+
+		wl_display_flush_clients(wl_display);
+		int ret = wl_event_loop_dispatch(wl_event_loop, 1);
+		if (ret < 0) {
+			wlr_log(WLR_ERROR, "wl_event_loop_dispatch failed");
+			return 1;
+		}
+
 		if (!running) {
 			break;
 		}
@@ -780,5 +805,7 @@ int main(int argc, char *argv[]) {
 	free(views);
 	free(view_configs);
 	xrDestroyInstance(instance);
+	wl_display_destroy_clients(wl_display);
+	wl_display_destroy(wl_display);
 	return 0;
 }
