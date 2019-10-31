@@ -470,7 +470,7 @@ error:
 	return NULL;
 }
 
-static void render_xr_view(struct wxrc_xr_view *view, GLuint framebuffer,
+static void wxrc_xr_render_view(struct wxrc_xr_view *view, GLuint framebuffer,
 		XrSwapchainImageOpenGLESKHR *image) {
 	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 
@@ -484,6 +484,60 @@ static void render_xr_view(struct wxrc_xr_view *view, GLuint framebuffer,
 	glClear(GL_COLOR_BUFFER_BIT);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+static XrResult wxrc_xr_push_view_frame(struct wxrc_xr_view *view,
+		XrView *xr_view, XrCompositionLayerProjectionView *projection_view) {
+	XrSwapchainImageAcquireInfo swapchain_image_acquire_info = {
+		.type = XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO,
+		.next = NULL,
+	};
+	uint32_t buffer_index;
+	XrResult r = xrAcquireSwapchainImage(view->swapchain,
+		&swapchain_image_acquire_info, &buffer_index);
+	if (XR_FAILED(r)) {
+		wxrc_log_xr_result("xrAcquireSwapchainImage", r);
+		return r;
+	}
+
+	XrSwapchainImageWaitInfo swapchain_wait_info = {
+		.type = XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO,
+		.next = NULL,
+		.timeout = 1000,
+	};
+	r = xrWaitSwapchainImage(view->swapchain, &swapchain_wait_info);
+	if (XR_FAILED(r)) {
+		wxrc_log_xr_result("xrWaitSwapchainImage", r);
+		return r;
+	}
+
+	projection_view->type = XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW;
+	projection_view->next = NULL;
+	projection_view->pose = xr_view->pose;
+	projection_view->fov = xr_view->fov;
+	projection_view->subImage.swapchain = view->swapchain;
+	projection_view->subImage.imageArrayIndex = buffer_index;
+	projection_view->subImage.imageRect.offset.x = 0;
+	projection_view->subImage.imageRect.offset.y = 0;
+	projection_view->subImage.imageRect.extent.width =
+		view->config.recommendedImageRectWidth;
+	projection_view->subImage.imageRect.extent.height =
+		view->config.recommendedImageRectHeight;
+
+	wxrc_xr_render_view(view, view->framebuffers[buffer_index],
+		&view->images[buffer_index]);
+
+	XrSwapchainImageReleaseInfo swapchain_release_info = {
+		.type = XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO,
+		.next = NULL,
+	};
+	r = xrReleaseSwapchainImage(view->swapchain, &swapchain_release_info);
+	if (XR_FAILED(r)) {
+		wxrc_log_xr_result("xrReleaseSwapchainImage", r);
+		return r;
+	}
+
+	return r;
 }
 
 int main(int argc, char *argv[]) {
@@ -604,55 +658,7 @@ int main(int argc, char *argv[]) {
 
 		for (uint32_t i = 0; i < nviews; i++) {
 			struct wxrc_xr_view *view = &views[i];
-
-			XrSwapchainImageAcquireInfo swapchain_image_acquire_info = {
-				.type = XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO,
-				.next = NULL,
-			};
-			uint32_t buffer_index;
-			r = xrAcquireSwapchainImage(view->swapchain,
-				&swapchain_image_acquire_info, &buffer_index);
-			if (XR_FAILED(r)) {
-				wxrc_log_xr_result("xrAcquireSwapchainImage", r);
-				return 1;
-			}
-
-			XrSwapchainImageWaitInfo swapchain_wait_info = {
-				.type = XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO,
-				.next = NULL,
-				.timeout = 1000,
-			};
-			r = xrWaitSwapchainImage(view->swapchain, &swapchain_wait_info);
-			if (XR_FAILED(r)) {
-				wxrc_log_xr_result("xrWaitSwapchainImage", r);
-				return 1;
-			}
-
-			projection_views[i].type = XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW;
-			projection_views[i].next = NULL;
-			projection_views[i].pose = xr_views[i].pose;
-			projection_views[i].fov = xr_views[i].fov;
-			projection_views[i].subImage.swapchain = view->swapchain;
-			projection_views[i].subImage.imageArrayIndex = buffer_index;
-			projection_views[i].subImage.imageRect.offset.x = 0;
-			projection_views[i].subImage.imageRect.offset.y = 0;
-			projection_views[i].subImage.imageRect.extent.width =
-				view->config.recommendedImageRectWidth;
-			projection_views[i].subImage.imageRect.extent.height =
-				view->config.recommendedImageRectHeight;
-
-			render_xr_view(view, view->framebuffers[buffer_index],
-				&view->images[buffer_index]);
-
-			XrSwapchainImageReleaseInfo swapchain_release_info = {
-				.type = XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO,
-				.next = NULL,
-			};
-			r = xrReleaseSwapchainImage(view->swapchain, &swapchain_release_info);
-			if (XR_FAILED(r)) {
-				wxrc_log_xr_result("xrReleaseSwapchainImage", r);
-				return 1;
-			}
+			wxrc_xr_push_view_frame(view, &xr_views[i], &projection_views[i]);
 		}
 
 		XrCompositionLayerProjection projection_layer = {
