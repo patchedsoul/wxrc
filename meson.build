@@ -34,6 +34,7 @@ add_project_arguments(cc.get_supported_arguments([
 	'-Wno-unused-parameter',
 ]), language: 'c')
 
+cglm = dependency('cglm')
 egl = dependency('egl')
 glesv2 = dependency('glesv2')
 openxr = dependency('openxr')
@@ -50,6 +51,7 @@ executable('wxrc',
 		'src/xrutil.c',
 	),
 	dependencies: [
+		cglm,
 		egl,
 		glesv2,
 		openxr,
