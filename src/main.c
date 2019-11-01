@@ -80,7 +80,7 @@ exit:
 XrResult wxrc_create_xr_instance(XrInstance *instance) {
 	const char *extensions[] = {
 		XR_KHR_OPENGL_ES_ENABLE_EXTENSION_NAME,
-		XR_KHR_EGL_ENABLE_EXTENSION_NAME,
+		XR_MND_EGL_ENABLE_EXTENSION_NAME,
 	};
 	XrInstanceCreateInfo info = {
 		.type = XR_TYPE_INSTANCE_CREATE_INFO,
@@ -324,8 +324,8 @@ XrResult wxrc_create_xr_session(XrInstance instance,
 		return XR_ERROR_INITIALIZATION_FAILED;
 	}
 
-	XrGraphicsBindingEGLKHR gfx = {
-		.type = XR_TYPE_GRAPHICS_BINDING_EGL_KHR,
+	XrGraphicsBindingEGLMND gfx = {
+		.type = XR_TYPE_GRAPHICS_BINDING_EGL_MND,
 		.getProcAddress = eglGetProcAddress,
 		.display = egl_display,
 		.config = egl_config,
