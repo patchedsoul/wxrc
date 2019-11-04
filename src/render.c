@@ -24,8 +24,8 @@ static const GLchar fragment_shader_src[] =
 	"varying vec3 vertex_pos;\n"
 	"\n"
 	"void main() {\n"
-	"	if (fract(vertex_pos.x * 5.0) < 0.02 ||\n"
-	"			fract(vertex_pos.y * 5.0) < 0.02) {\n"
+	"	if (fract(vertex_pos.x * 50.0) < 0.02 ||\n"
+	"			fract(vertex_pos.y * 50.0) < 0.02) {\n"
 	"		gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);\n"
 	"	} else {\n"
 	"		gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);\n"
@@ -119,10 +119,11 @@ void wxrc_gl_render_view(struct wxrc_gl *gl, struct wxrc_xr_view *view,
 	glUseProgram(gl->shader_program);
 
 	mat4 model_matrix;
-	glm_rotate_make(model_matrix, -45.0, (vec3){ 1.0, 0.0, 0.0 });
+	glm_rotate_make(model_matrix,  glm_rad(-45.0), (vec3){ 1.0, 0.0, 0.0 });
+	glm_scale(model_matrix, (vec3){ 10.0, 10.0, 10.0 });
 
 	mat4 view_matrix;
-	glm_translate_make(view_matrix, (vec3){ 0.0, 0.0, -3.0 });
+	glm_translate_make(view_matrix, (vec3){ 0.0, 0.0, -2.0 });
 
 	mat4 projection_matrix;
 	glm_perspective_default((float)width / height, projection_matrix);
