@@ -619,7 +619,7 @@ static void wxrc_xr_render_view(struct wxrc_xr_view *view, GLuint framebuffer,
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-static XrResult wxrc_xr_push_view_frame(struct wxrc_xr_view *view,
+static XrResult wxrc_xr_view_push_frame(struct wxrc_xr_view *view,
 		XrView *xr_view, XrCompositionLayerProjectionView *projection_view) {
 	XrSwapchainImageAcquireInfo swapchain_image_acquire_info = {
 		.type = XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO,
@@ -671,6 +671,72 @@ static XrResult wxrc_xr_push_view_frame(struct wxrc_xr_view *view,
 	}
 
 	return r;
+}
+
+static bool wxrc_xr_push_frame(struct wxrc_xr *xr, XrFrameState *frame_state,
+		XrView *xr_views, XrCompositionLayerProjectionView *projection_views) {
+	for (uint32_t i = 0; i < xr->nviews; i++) {
+		xr_views[i].type = XR_TYPE_VIEW;
+		xr_views[i].next = NULL;
+	}
+
+	XrViewLocateInfo view_locate_info = {
+		.type = XR_TYPE_VIEW_LOCATE_INFO,
+		.displayTime = frame_state->predictedDisplayTime,
+		.space = xr->local_space,
+	};
+	XrViewState view_state = {
+		.type = XR_TYPE_VIEW_STATE,
+		.next = NULL,
+	};
+	XrResult r = xrLocateViews(xr->session, &view_locate_info, &view_state,
+		xr->nviews, &xr->nviews, xr_views);
+	if (XR_FAILED(r)) {
+		wxrc_log_xr_result("xrLocateViews", r);
+		return false;
+	}
+
+	XrFrameBeginInfo frame_begin_info = {
+		.type = XR_TYPE_FRAME_BEGIN_INFO,
+		.next = NULL,
+	};
+	r = xrBeginFrame(xr->session, &frame_begin_info);
+	if (XR_FAILED(r)) {
+		wxrc_log_xr_result("xrBeginFrame", r);
+		return false;
+	}
+
+	for (uint32_t i = 0; i < xr->nviews; i++) {
+		struct wxrc_xr_view *view = &xr->views[i];
+		wxrc_xr_view_push_frame(view, &xr_views[i], &projection_views[i]);
+	}
+
+	XrCompositionLayerProjection projection_layer = {
+		.type = XR_TYPE_COMPOSITION_LAYER_PROJECTION,
+		.next = NULL,
+		.layerFlags = 0,
+		.space = xr->local_space,
+		.viewCount = xr->nviews,
+		.views = projection_views,
+	};
+	const XrCompositionLayerBaseHeader *projection_layers[] = {
+		(XrCompositionLayerBaseHeader *)&projection_layer,
+	};
+	XrFrameEndInfo frame_end_info = {
+		.type = XR_TYPE_FRAME_END_INFO,
+		.displayTime = frame_state->predictedDisplayTime,
+		.layerCount = 1,
+		.layers = projection_layers,
+		.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE,
+		.next = NULL,
+	};
+	r = xrEndFrame(xr->session, &frame_end_info);
+	if (XR_FAILED(r)) {
+		wxrc_log_xr_result("xrEndFrame", r);
+		return false;
+	}
+
+	return true;
 }
 
 static void wxrc_xr_handle_event(XrEventDataBuffer *event, bool *running) {
@@ -761,64 +827,7 @@ int main(int argc, char *argv[]) {
 			break;
 		}
 
-		for (uint32_t i = 0; i < xr.nviews; i++) {
-			xr_views[i].type = XR_TYPE_VIEW;
-			xr_views[i].next = NULL;
-		}
-
-		XrViewLocateInfo view_locate_info = {
-			.type = XR_TYPE_VIEW_LOCATE_INFO,
-			.displayTime = frame_state.predictedDisplayTime,
-			.space = xr.local_space,
-		};
-		XrViewState view_state = {
-			.type = XR_TYPE_VIEW_STATE,
-			.next = NULL,
-		};
-		r = xrLocateViews(xr.session, &view_locate_info, &view_state, xr.nviews,
-			&xr.nviews, xr_views);
-		if (XR_FAILED(r)) {
-			wxrc_log_xr_result("xrLocateViews", r);
-			return 1;
-		}
-
-		XrFrameBeginInfo frame_begin_info = {
-			.type = XR_TYPE_FRAME_BEGIN_INFO,
-			.next = NULL,
-		};
-		r = xrBeginFrame(xr.session, &frame_begin_info);
-		if (XR_FAILED(r)) {
-			wxrc_log_xr_result("xrBeginFrame", r);
-			return 1;
-		}
-
-		for (uint32_t i = 0; i < xr.nviews; i++) {
-			struct wxrc_xr_view *view = &xr.views[i];
-			wxrc_xr_push_view_frame(view, &xr_views[i], &projection_views[i]);
-		}
-
-		XrCompositionLayerProjection projection_layer = {
-			.type = XR_TYPE_COMPOSITION_LAYER_PROJECTION,
-			.next = NULL,
-			.layerFlags = 0,
-			.space = xr.local_space,
-			.viewCount = xr.nviews,
-			.views = projection_views,
-		};
-		const XrCompositionLayerBaseHeader *projection_layers[] = {
-			(XrCompositionLayerBaseHeader *)&projection_layer,
-		};
-		XrFrameEndInfo frame_end_info = {
-			.type = XR_TYPE_FRAME_END_INFO,
-			.displayTime = frame_state.predictedDisplayTime,
-			.layerCount = 1,
-			.layers = projection_layers,
-			.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE,
-			.next = NULL,
-		};
-		r = xrEndFrame(xr.session, &frame_end_info);
-		if (XR_FAILED(r)) {
-			wxrc_log_xr_result("xrEndFrame", r);
+		if (!wxrc_xr_push_frame(&xr, &frame_state, xr_views, projection_views)) {
 			return 1;
 		}
 	}
