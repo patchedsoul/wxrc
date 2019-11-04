@@ -104,7 +104,7 @@ void wxrc_gl_finish(struct wxrc_gl *gl) {
 }
 
 void wxrc_gl_render_view(struct wxrc_gl *gl, struct wxrc_xr_view *view,
-		GLuint framebuffer, GLuint image) {
+		XrView *xr_view, GLuint framebuffer, GLuint image) {
 	uint32_t width = view->config.recommendedImageRectWidth;
 	uint32_t height = view->config.recommendedImageRectHeight;
 

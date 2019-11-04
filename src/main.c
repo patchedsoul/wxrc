@@ -642,7 +642,7 @@ static XrResult wxrc_xr_view_push_frame(struct wxrc_xr_view *view,
 	projection_view->subImage.imageRect.extent.height =
 		view->config.recommendedImageRectHeight;
 
-	wxrc_gl_render_view(gl, view, view->framebuffers[buffer_index],
+	wxrc_gl_render_view(gl, view, xr_view, view->framebuffers[buffer_index],
 		view->images[buffer_index].image);
 
 	XrSwapchainImageReleaseInfo swapchain_release_info = {
