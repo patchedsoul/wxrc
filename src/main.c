@@ -673,7 +673,7 @@ static XrResult wxrc_xr_view_push_frame(struct wxrc_xr_view *view,
 	return r;
 }
 
-static bool wxrc_xr_push_frame(struct wxrc_xr *xr, XrFrameState *frame_state,
+static bool wxrc_xr_push_frame(struct wxrc_xr *xr, XrTime predicted_display_time,
 		XrView *xr_views, XrCompositionLayerProjectionView *projection_views) {
 	for (uint32_t i = 0; i < xr->nviews; i++) {
 		xr_views[i].type = XR_TYPE_VIEW;
@@ -682,7 +682,7 @@ static bool wxrc_xr_push_frame(struct wxrc_xr *xr, XrFrameState *frame_state,
 
 	XrViewLocateInfo view_locate_info = {
 		.type = XR_TYPE_VIEW_LOCATE_INFO,
-		.displayTime = frame_state->predictedDisplayTime,
+		.displayTime = predicted_display_time,
 		.space = xr->local_space,
 	};
 	XrViewState view_state = {
@@ -724,7 +724,7 @@ static bool wxrc_xr_push_frame(struct wxrc_xr *xr, XrFrameState *frame_state,
 	};
 	XrFrameEndInfo frame_end_info = {
 		.type = XR_TYPE_FRAME_END_INFO,
-		.displayTime = frame_state->predictedDisplayTime,
+		.displayTime = predicted_display_time,
 		.layerCount = 1,
 		.layers = projection_layers,
 		.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE,
@@ -827,7 +827,8 @@ int main(int argc, char *argv[]) {
 			break;
 		}
 
-		if (!wxrc_xr_push_frame(&xr, &frame_state, xr_views, projection_views)) {
+		if (!wxrc_xr_push_frame(&xr, frame_state.predictedDisplayTime,
+				xr_views, projection_views)) {
 			return 1;
 		}
 	}
