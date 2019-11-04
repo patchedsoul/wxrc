@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200112L
 #include <EGL/egl.h>
+#include <GLES2/gl2.h>
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
 #include <wayland-client.h>
@@ -644,6 +645,7 @@ static XrResult wxrc_xr_view_push_frame(struct wxrc_xr_view *view,
 
 	wxrc_gl_render_view(gl, view, xr_view, view->framebuffers[buffer_index],
 		view->images[buffer_index].image);
+	glFinish();
 
 	XrSwapchainImageReleaseInfo swapchain_release_info = {
 		.type = XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO,
