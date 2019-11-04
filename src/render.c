@@ -21,6 +21,7 @@ static const GLchar fragment_shader_src[] =
 	"#version 100\n"
 	"precision mediump float;\n"
 	"\n"
+	"uniform vec4 fg_color;\n"
 	"uniform vec4 bg_color;\n"
 	"\n"
 	"varying vec3 vertex_pos;\n"
@@ -28,7 +29,7 @@ static const GLchar fragment_shader_src[] =
 	"void main() {\n"
 	"	if (fract(vertex_pos.x * 50.0) < 0.02 ||\n"
 	"			fract(vertex_pos.y * 50.0) < 0.02) {\n"
-	"		gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);\n"
+	"		gl_FragColor = fg_color;\n"
 	"	} else {\n"
 	"		gl_FragColor = bg_color;\n"
 	"	}\n"
@@ -107,6 +108,7 @@ void wxrc_gl_render_view(struct wxrc_gl *gl, struct wxrc_xr_view *view,
 
 	GLint pos_loc = glGetAttribLocation(gl->shader_program, "pos");
 	GLint mvp_loc = glGetUniformLocation(gl->shader_program, "mvp");
+	GLint fg_color_loc = glGetUniformLocation(gl->shader_program, "fg_color");
 	GLint bg_color_loc = glGetUniformLocation(gl->shader_program, "bg_color");
 
 	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
@@ -116,6 +118,7 @@ void wxrc_gl_render_view(struct wxrc_gl *gl, struct wxrc_xr_view *view,
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
 		image, 0);
 
+	const float fg_color[] = { 1.0, 1.0, 1.0, 1.0 };
 	const float bg_color[] = { 0.08, 0.07, 0.16, 1.0 };
 
 	glClearColor(bg_color[0], bg_color[1], bg_color[2], bg_color[3]);
@@ -123,6 +126,7 @@ void wxrc_gl_render_view(struct wxrc_gl *gl, struct wxrc_xr_view *view,
 
 	glUseProgram(gl->shader_program);
 
+	glUniform4fv(fg_color_loc, 1, (GLfloat *)fg_color);
 	glUniform4fv(bg_color_loc, 1, (GLfloat *)bg_color);
 
 	mat4 model_matrix;
