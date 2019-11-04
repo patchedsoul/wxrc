@@ -29,7 +29,9 @@ static const GLchar fragment_shader_src[] =
 	"void main() {\n"
 	"	if (fract(vertex_pos.x * 50.0) < 0.02 ||\n"
 	"			fract(vertex_pos.y * 50.0) < 0.02) {\n"
-	"		gl_FragColor = fg_color;\n"
+	"		float a = distance(vertex_pos, vec3(0)) * 7.0;\n"
+	"		a = min(a, 1.0);\n"
+	"		gl_FragColor = mix(fg_color, bg_color, a);\n"
 	"	} else {\n"
 	"		gl_FragColor = bg_color;\n"
 	"	}\n"
@@ -130,7 +132,7 @@ void wxrc_gl_render_view(struct wxrc_gl *gl, struct wxrc_xr_view *view,
 	glUniform4fv(bg_color_loc, 1, (GLfloat *)bg_color);
 
 	mat4 model_matrix;
-	glm_rotate_make(model_matrix,  glm_rad(-45.0), (vec3){ 1.0, 0.0, 0.0 });
+	glm_rotate_make(model_matrix,  glm_rad(-65.0), (vec3){ 1.0, 0.0, 0.0 });
 	glm_scale(model_matrix, (vec3){ 10.0, 10.0, 10.0 });
 
 	mat4 view_matrix;
