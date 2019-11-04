@@ -111,15 +111,16 @@ void wxrc_gl_render_view(struct wxrc_gl *gl, struct wxrc_xr_view *view,
 	glUseProgram(gl->shader_program);
 
 	const float points[] = {
-		0.0, 0.5, 0.0,
-		0.5, -0.5, 0.0,
 		-0.5, -0.5, 0.0,
+		-0.5, 0.5, 0.0,
+		0.5, -0.5, 0.0,
+		0.5, 0.5, 0.0,
 	};
 
 	glVertexAttribPointer(in_pos, 3, GL_FLOAT, GL_FALSE, 0, points);
 	glEnableVertexAttribArray(in_pos);
 
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 3);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
 	glDisableVertexAttribArray(in_pos);
 
