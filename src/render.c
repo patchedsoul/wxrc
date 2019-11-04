@@ -157,7 +157,7 @@ void wxrc_gl_render_view(struct wxrc_gl *gl, struct wxrc_xr_view *view,
 	glm_quat_mat4(orientation, view_matrix);
 	wxrc_xr_vector3f_to_cglm(&xr_view->pose.position, position);
 	/* TODO: translate grid with position */
-	position[0] = position[1] = position[2] = 0;
+	position[1] = 0;
 	glm_translate(view_matrix, position);
 	glm_mat4_inv(view_matrix, view_matrix);
 
