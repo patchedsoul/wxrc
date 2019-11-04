@@ -520,11 +520,87 @@ error:
 	return NULL;
 }
 
+static bool wxrc_xr_init(struct wxrc_xr *xr) {
+	if (XR_FAILED(wxrc_xr_enumerate_layer_props())) {
+		return false;
+	}
+	if (XR_FAILED(wxrc_xr_enumerate_instance_props())) {
+		return false;
+	}
+
+	XrResult r = wxrc_create_xr_instance(&xr->instance);
+	if (XR_FAILED(r)) {
+		return false;
+	}
+
+	XrSystemId sysid;
+	r = wxrc_get_xr_system(xr->instance, &sysid);
+	if (XR_FAILED(r)) {
+		return false;
+	}
+
+	if (XR_FAILED(wxrc_xr_enumerate_view_configs(xr->instance, sysid))) {
+		return false;
+	}
+
+	XrViewConfigurationView *view_configs =
+		wxrc_xr_enumerate_stereo_config_views(xr->instance, sysid, &xr->nviews);
+	if (view_configs == NULL) {
+		return false;
+	}
+
+	r = wxrc_create_xr_session(xr->instance, sysid, &xr->session);
+	if (XR_FAILED(r)) {
+		return false;
+	}
+
+	if (XR_FAILED(wxrc_xr_enumerate_reference_spaces(xr->session))) {
+		return 1;
+	}
+
+	r = wxrc_xr_create_local_reference_space(xr->session, &xr->local_space);
+	if (XR_FAILED(r)) {
+		return false;
+	}
+
+	wlr_log(WLR_DEBUG, "Starting XR session");
+	XrSessionBeginInfo session_begin_info = {
+		.type = XR_TYPE_SESSION_BEGIN_INFO,
+		.next = NULL,
+		.primaryViewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
+	};
+	r = xrBeginSession(xr->session, &session_begin_info);
+	if (XR_FAILED(r)) {
+		wxrc_log_xr_result("xrBeginSession", r);
+		return false;
+	}
+
+	xr->views =
+		wxrc_xr_create_swapchains(xr->session, xr->nviews, view_configs);
+	if (xr->views == NULL) {
+		return false;
+	}
+
+	free(view_configs);
+
+	return true;
+}
+
 static void wxrc_xr_view_finish(struct wxrc_xr_view *view) {
 	glDeleteFramebuffers(view->nimages, view->framebuffers);
 	free(view->framebuffers);
 	free(view->images);
 	xrDestroySwapchain(view->swapchain);
+}
+
+static void wxrc_xr_finish(struct wxrc_xr *xr) {
+	for (uint32_t i = 0; i < xr->nviews; i++) {
+		wxrc_xr_view_finish(&xr->views[i]);
+	}
+	free(xr->views);
+	xrDestroySpace(xr->local_space);
+	xrDestroySession(xr->session);
+	xrDestroyInstance(xr->instance);
 }
 
 static void wxrc_xr_render_view(struct wxrc_xr_view *view, GLuint framebuffer,
@@ -629,67 +705,8 @@ int main(int argc, char *argv[]) {
 	}
 	struct wl_event_loop *wl_event_loop = wl_display_get_event_loop(wl_display);
 
-	if (XR_FAILED(wxrc_xr_enumerate_layer_props())) {
-		return 1;
-	}
-	if (XR_FAILED(wxrc_xr_enumerate_instance_props())) {
-		return 1;
-	}
-
-	XrInstance instance;
-	XrResult r = wxrc_create_xr_instance(&instance);
-	if (XR_FAILED(r)) {
-		return 1;
-	}
-
-	XrSystemId sysid;
-	r = wxrc_get_xr_system(instance, &sysid);
-	if (XR_FAILED(r)) {
-		return 1;
-	}
-
-	if (XR_FAILED(wxrc_xr_enumerate_view_configs(instance, sysid))) {
-		return 1;
-	}
-
-	uint32_t nviews;
-	XrViewConfigurationView *view_configs =
-		wxrc_xr_enumerate_stereo_config_views(instance, sysid, &nviews);
-	if (view_configs == NULL) {
-		return 1;
-	}
-
-	XrSession session;
-	r = wxrc_create_xr_session(instance, sysid, &session);
-	if (XR_FAILED(r)) {
-		return 1;
-	}
-
-	if (XR_FAILED(wxrc_xr_enumerate_reference_spaces(session))) {
-		return 1;
-	}
-
-	XrSpace local_space;
-	r = wxrc_xr_create_local_reference_space(session, &local_space);
-	if (XR_FAILED(r)) {
-		return 1;
-	}
-
-	wlr_log(WLR_DEBUG, "Starting XR session");
-	XrSessionBeginInfo session_begin_info = {
-		.type = XR_TYPE_SESSION_BEGIN_INFO,
-		.next = NULL,
-		.primaryViewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
-	};
-	r = xrBeginSession(session, &session_begin_info);
-	if (XR_FAILED(r)) {
-		wxrc_log_xr_result("xrBeginSession", r);
-		return 1;
-	}
-
-	struct wxrc_xr_view *views =
-		wxrc_xr_create_swapchains(session, nviews, view_configs);
-	if (views == NULL) {
+	struct wxrc_xr xr = {0};
+	if (!wxrc_xr_init(&xr)) {
 		return 1;
 	}
 
@@ -701,9 +718,9 @@ int main(int argc, char *argv[]) {
 	wlr_log(WLR_DEBUG, "Wayland compositor listening on %s", wl_socket);
 
 	wlr_log(WLR_DEBUG, "Starting XR main loop");
-	XrView *xr_views = calloc(nviews, sizeof(XrView));
+	XrView *xr_views = calloc(xr.nviews, sizeof(XrView));
 	XrCompositionLayerProjectionView *projection_views =
-		calloc(nviews, sizeof(XrCompositionLayerProjectionView));
+		calloc(xr.nviews, sizeof(XrCompositionLayerProjectionView));
 	bool running = true;
 	while (running) {
 		XrFrameWaitInfo frame_wait_info = {
@@ -714,7 +731,7 @@ int main(int argc, char *argv[]) {
 			.type = XR_TYPE_FRAME_STATE,
 			.next = NULL,
 		};
-		r = xrWaitFrame(session, &frame_wait_info, &frame_state);
+		XrResult r = xrWaitFrame(xr.session, &frame_wait_info, &frame_state);
 		if (XR_FAILED(r)) {
 			wxrc_log_xr_result("xrWaitFrame", r);
 			return 1;
@@ -724,7 +741,7 @@ int main(int argc, char *argv[]) {
 			.type = XR_TYPE_EVENT_DATA_BUFFER,
 			.next = NULL,
 		};
-		r = xrPollEvent(instance, &event);
+		r = xrPollEvent(xr.instance, &event);
 		if (r != XR_EVENT_UNAVAILABLE) {
 			if (XR_FAILED(r)) {
 				wxrc_log_xr_result("xrPollEvent", r);
@@ -744,7 +761,7 @@ int main(int argc, char *argv[]) {
 			break;
 		}
 
-		for (uint32_t i = 0; i < nviews; i++) {
+		for (uint32_t i = 0; i < xr.nviews; i++) {
 			xr_views[i].type = XR_TYPE_VIEW;
 			xr_views[i].next = NULL;
 		}
@@ -752,14 +769,14 @@ int main(int argc, char *argv[]) {
 		XrViewLocateInfo view_locate_info = {
 			.type = XR_TYPE_VIEW_LOCATE_INFO,
 			.displayTime = frame_state.predictedDisplayTime,
-			.space = local_space,
+			.space = xr.local_space,
 		};
 		XrViewState view_state = {
 			.type = XR_TYPE_VIEW_STATE,
 			.next = NULL,
 		};
-		r = xrLocateViews(session, &view_locate_info, &view_state, nviews,
-			&nviews, xr_views);
+		r = xrLocateViews(xr.session, &view_locate_info, &view_state, xr.nviews,
+			&xr.nviews, xr_views);
 		if (XR_FAILED(r)) {
 			wxrc_log_xr_result("xrLocateViews", r);
 			return 1;
@@ -769,14 +786,14 @@ int main(int argc, char *argv[]) {
 			.type = XR_TYPE_FRAME_BEGIN_INFO,
 			.next = NULL,
 		};
-		r = xrBeginFrame(session, &frame_begin_info);
+		r = xrBeginFrame(xr.session, &frame_begin_info);
 		if (XR_FAILED(r)) {
 			wxrc_log_xr_result("xrBeginFrame", r);
 			return 1;
 		}
 
-		for (uint32_t i = 0; i < nviews; i++) {
-			struct wxrc_xr_view *view = &views[i];
+		for (uint32_t i = 0; i < xr.nviews; i++) {
+			struct wxrc_xr_view *view = &xr.views[i];
 			wxrc_xr_push_view_frame(view, &xr_views[i], &projection_views[i]);
 		}
 
@@ -784,8 +801,8 @@ int main(int argc, char *argv[]) {
 			.type = XR_TYPE_COMPOSITION_LAYER_PROJECTION,
 			.next = NULL,
 			.layerFlags = 0,
-			.space = local_space,
-			.viewCount = nviews,
+			.space = xr.local_space,
+			.viewCount = xr.nviews,
 			.views = projection_views,
 		};
 		const XrCompositionLayerBaseHeader *projection_layers[] = {
@@ -799,7 +816,7 @@ int main(int argc, char *argv[]) {
 			.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE,
 			.next = NULL,
 		};
-		r = xrEndFrame(session, &frame_end_info);
+		r = xrEndFrame(xr.session, &frame_end_info);
 		if (XR_FAILED(r)) {
 			wxrc_log_xr_result("xrEndFrame", r);
 			return 1;
@@ -809,14 +826,7 @@ int main(int argc, char *argv[]) {
 	wlr_log(WLR_DEBUG, "Tearing down XR instance");
 	free(projection_views);
 	free(xr_views);
-	for (uint32_t i = 0; i < nviews; i++) {
-		wxrc_xr_view_finish(&views[i]);
-	}
-	free(views);
-	free(view_configs);
-	xrDestroySpace(local_space);
-	xrDestroySession(session);
-	xrDestroyInstance(instance);
+	wxrc_xr_finish(&xr);
 	wl_display_destroy_clients(wl_display);
 	wl_display_destroy(wl_display);
 	return 0;
