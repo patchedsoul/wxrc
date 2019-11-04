@@ -103,6 +103,19 @@ void wxrc_gl_finish(struct wxrc_gl *gl) {
 	glDeleteProgram(gl->shader_program);
 }
 
+static void wxrc_xr_vector3f_to_cglm(const XrVector3f *in, vec3 out) {
+	out[0] = in->x;
+	out[1] = in->y;
+	out[2] = in->z;
+}
+
+static void wxrc_xr_quaternion_to_cglm(const XrQuaternionf *in, versor out) {
+	out[0] = in->x;
+	out[1] = in->y;
+	out[2] = in->z;
+	out[3] = in->w;
+}
+
 void wxrc_gl_render_view(struct wxrc_gl *gl, struct wxrc_xr_view *view,
 		XrView *xr_view, GLuint framebuffer, GLuint image) {
 	uint32_t width = view->config.recommendedImageRectWidth;
@@ -136,9 +149,19 @@ void wxrc_gl_render_view(struct wxrc_gl *gl, struct wxrc_xr_view *view,
 	glm_scale(model_matrix, (vec3){ 10.0, 10.0, 10.0 });
 
 	mat4 view_matrix;
-	glm_translate_make(view_matrix, (vec3){ 0.0, 0.0, -2.0 });
+	versor orientation;
+	vec3 position;
+	wxrc_xr_quaternion_to_cglm(&xr_view->pose.orientation, orientation);
+	glm_quat_mat4(orientation, view_matrix);
+	wxrc_xr_vector3f_to_cglm(&xr_view->pose.position, position);
+	/* TODO: translate grid with position */
+	position[0] = 0.0;
+	position[1] = 0.0;
+	position[2] -= 2.0;
+	glm_translate(view_matrix, position);
 
 	mat4 projection_matrix;
+	/* TODO: use xr_view->fov */
 	glm_perspective_default((float)width / height, projection_matrix);
 
 	mat4 mvp_matrix = GLM_MAT4_IDENTITY_INIT;
