@@ -9,7 +9,7 @@ static const GLchar vertex_shader_src[] =
 	"attribute vec3 in_pos;\n"
 	"\n"
 	"void main() {\n"
-	"    gl_Position = vec4(in_pos, 1.0);\n"
+	"	gl_Position = vec4(in_pos, 1.0);\n"
 	"}\n";
 
 static const GLchar fragment_shader_src[] =
@@ -17,7 +17,12 @@ static const GLchar fragment_shader_src[] =
 	"precision mediump float;\n"
 	"\n"
 	"void main() {\n"
-	"    gl_FragColor = vec4(0.5, 0.0, 0.5, 1.0);"
+	"	if (fract(gl_FragCoord.x / 100.0) < 0.01 ||\n"
+	"			fract(gl_FragCoord.y / 100.0) < 0.01) {\n"
+	"		gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);\n"
+	"	} else {\n"
+	"		gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);\n"
+	"	}\n"
 	"}\n";
 
 static GLuint wxrc_gl_compile_shader(GLuint type, const GLchar *src) {
