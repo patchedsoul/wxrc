@@ -21,6 +21,8 @@ static const GLchar fragment_shader_src[] =
 	"#version 100\n"
 	"precision mediump float;\n"
 	"\n"
+	"uniform vec4 bg_color;\n"
+	"\n"
 	"varying vec3 vertex_pos;\n"
 	"\n"
 	"void main() {\n"
@@ -28,7 +30,7 @@ static const GLchar fragment_shader_src[] =
 	"			fract(vertex_pos.y * 50.0) < 0.02) {\n"
 	"		gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);\n"
 	"	} else {\n"
-	"		gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);\n"
+	"		gl_FragColor = bg_color;\n"
 	"	}\n"
 	"}\n";
 
@@ -105,6 +107,7 @@ void wxrc_gl_render_view(struct wxrc_gl *gl, struct wxrc_xr_view *view,
 
 	GLint pos_loc = glGetAttribLocation(gl->shader_program, "pos");
 	GLint mvp_loc = glGetUniformLocation(gl->shader_program, "mvp");
+	GLint bg_color_loc = glGetUniformLocation(gl->shader_program, "bg_color");
 
 	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 
@@ -113,10 +116,14 @@ void wxrc_gl_render_view(struct wxrc_gl *gl, struct wxrc_xr_view *view,
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
 		image, 0);
 
-	glClearColor(0.0, 0.0, 1.0, 1.0);
+	const float bg_color[] = { 0.08, 0.07, 0.16, 1.0 };
+
+	glClearColor(bg_color[0], bg_color[1], bg_color[2], bg_color[3]);
 	glClear(GL_COLOR_BUFFER_BIT);
 
 	glUseProgram(gl->shader_program);
+
+	glUniform4fv(bg_color_loc, 1, (GLfloat *)bg_color);
 
 	mat4 model_matrix;
 	glm_rotate_make(model_matrix,  glm_rad(-45.0), (vec3){ 1.0, 0.0, 0.0 });
