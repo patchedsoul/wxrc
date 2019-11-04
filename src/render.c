@@ -27,8 +27,8 @@ static const GLchar fragment_shader_src[] =
 	"varying vec3 vertex_pos;\n"
 	"\n"
 	"void main() {\n"
-	"	if (fract(vertex_pos.x * 50.0) < 0.02 ||\n"
-	"			fract(vertex_pos.y * 50.0) < 0.02) {\n"
+	"	if (fract(vertex_pos.x * 100.0) < 0.01 ||\n"
+	"			fract(vertex_pos.y * 100.0) < 0.01) {\n"
 	"		float a = distance(vertex_pos, vec3(0)) * 7.0;\n"
 	"		a = min(a, 1.0);\n"
 	"		gl_FragColor = mix(fg_color, bg_color, a);\n"
@@ -145,8 +145,10 @@ void wxrc_gl_render_view(struct wxrc_gl *gl, struct wxrc_xr_view *view,
 	glUniform4fv(bg_color_loc, 1, (GLfloat *)bg_color);
 
 	mat4 model_matrix;
-	glm_rotate_make(model_matrix,  glm_rad(-65.0), (vec3){ 1.0, 0.0, 0.0 });
-	glm_scale(model_matrix, (vec3){ 10.0, 10.0, 10.0 });
+	glm_mat4_identity(model_matrix);
+	glm_translate(model_matrix, (vec3){ 0.0, -1.0, 0.0 });
+	glm_scale(model_matrix, (vec3){ 50.0, 50.0, 50.0 });
+	glm_rotate(model_matrix, glm_rad(90.0), (vec3){ 1.0, 0.0, 0.0 });
 
 	mat4 view_matrix;
 	versor orientation;
@@ -155,10 +157,9 @@ void wxrc_gl_render_view(struct wxrc_gl *gl, struct wxrc_xr_view *view,
 	glm_quat_mat4(orientation, view_matrix);
 	wxrc_xr_vector3f_to_cglm(&xr_view->pose.position, position);
 	/* TODO: translate grid with position */
-	position[0] = 0.0;
-	position[1] = 0.0;
-	position[2] -= 2.0;
+	position[0] = position[1] = position[2] = 0;
 	glm_translate(view_matrix, position);
+	glm_mat4_inv(view_matrix, view_matrix);
 
 	mat4 projection_matrix;
 	/* TODO: use xr_view->fov */
