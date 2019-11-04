@@ -520,6 +520,13 @@ error:
 	return NULL;
 }
 
+static void wxrc_xr_view_finish(struct wxrc_xr_view *view) {
+	glDeleteFramebuffers(view->nimages, view->framebuffers);
+	free(view->framebuffers);
+	free(view->images);
+	xrDestroySwapchain(view->swapchain);
+}
+
 static void wxrc_xr_render_view(struct wxrc_xr_view *view, GLuint framebuffer,
 		XrSwapchainImageOpenGLESKHR *image) {
 	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
@@ -802,8 +809,13 @@ int main(int argc, char *argv[]) {
 	wlr_log(WLR_DEBUG, "Tearing down XR instance");
 	free(projection_views);
 	free(xr_views);
+	for (uint32_t i = 0; i < nviews; i++) {
+		wxrc_xr_view_finish(&views[i]);
+	}
 	free(views);
 	free(view_configs);
+	xrDestroySpace(local_space);
+	xrDestroySession(session);
 	xrDestroyInstance(instance);
 	wl_display_destroy_clients(wl_display);
 	wl_display_destroy(wl_display);
