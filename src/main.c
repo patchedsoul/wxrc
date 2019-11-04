@@ -1,6 +1,5 @@
 #define _POSIX_C_SOURCE 200112L
 #include <EGL/egl.h>
-#include <GLES2/gl2.h>
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
 #include <wayland-client.h>
@@ -9,6 +8,7 @@
 #include <wlr/util/log.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "render.h"
 #include "xr.h"
 #include "xrutil.h"
 
@@ -282,7 +282,7 @@ XrResult wxrc_create_xr_session(XrInstance instance,
 		return XR_ERROR_INITIALIZATION_FAILED;
 	}
 
-	GLint egl_context_attribs[] = {
+	EGLint egl_context_attribs[] = {
 		EGL_CONTEXT_CLIENT_VERSION, 2,
 		EGL_NONE,
 	};
@@ -320,7 +320,7 @@ XrResult wxrc_create_xr_session(XrInstance instance,
 
 	if (XR_VERSION_MAJOR(reqs.minApiVersionSupported) > 2 ||
 			XR_VERSION_MAJOR(reqs.maxApiVersionSupported) < 2) {
-		wlr_log(WLR_ERROR, "XR runtime does not support a suitable GL version.");
+		wlr_log(WLR_ERROR, "XR runtime does not support a suitable GL version");
 		return XR_ERROR_INITIALIZATION_FAILED;
 	}
 
@@ -603,24 +603,9 @@ static void wxrc_xr_finish(struct wxrc_xr *xr) {
 	xrDestroyInstance(xr->instance);
 }
 
-static void wxrc_xr_render_view(struct wxrc_xr_view *view, GLuint framebuffer,
-		XrSwapchainImageOpenGLESKHR *image) {
-	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-
-	glViewport(0, 0, view->config.recommendedImageRectWidth,
-		view->config.recommendedImageRectHeight);
-
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-		image->image, 0);
-
-	glClearColor(0.0, 0.0, 1.0, 1.0);
-	glClear(GL_COLOR_BUFFER_BIT);
-
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-}
-
 static XrResult wxrc_xr_view_push_frame(struct wxrc_xr_view *view,
-		XrView *xr_view, XrCompositionLayerProjectionView *projection_view) {
+		struct wxrc_gl *gl, XrView *xr_view,
+		XrCompositionLayerProjectionView *projection_view) {
 	XrSwapchainImageAcquireInfo swapchain_image_acquire_info = {
 		.type = XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO,
 		.next = NULL,
@@ -657,8 +642,8 @@ static XrResult wxrc_xr_view_push_frame(struct wxrc_xr_view *view,
 	projection_view->subImage.imageRect.extent.height =
 		view->config.recommendedImageRectHeight;
 
-	wxrc_xr_render_view(view, view->framebuffers[buffer_index],
-		&view->images[buffer_index]);
+	wxrc_gl_render_view(gl, view, view->framebuffers[buffer_index],
+		view->images[buffer_index].image);
 
 	XrSwapchainImageReleaseInfo swapchain_release_info = {
 		.type = XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO,
@@ -673,8 +658,9 @@ static XrResult wxrc_xr_view_push_frame(struct wxrc_xr_view *view,
 	return r;
 }
 
-static bool wxrc_xr_push_frame(struct wxrc_xr *xr, XrTime predicted_display_time,
-		XrView *xr_views, XrCompositionLayerProjectionView *projection_views) {
+static bool wxrc_xr_push_frame(struct wxrc_xr *xr, struct wxrc_gl *gl,
+		XrTime predicted_display_time, XrView *xr_views,
+		XrCompositionLayerProjectionView *projection_views) {
 	for (uint32_t i = 0; i < xr->nviews; i++) {
 		xr_views[i].type = XR_TYPE_VIEW;
 		xr_views[i].next = NULL;
@@ -708,7 +694,7 @@ static bool wxrc_xr_push_frame(struct wxrc_xr *xr, XrTime predicted_display_time
 
 	for (uint32_t i = 0; i < xr->nviews; i++) {
 		struct wxrc_xr_view *view = &xr->views[i];
-		wxrc_xr_view_push_frame(view, &xr_views[i], &projection_views[i]);
+		wxrc_xr_view_push_frame(view, gl, &xr_views[i], &projection_views[i]);
 	}
 
 	XrCompositionLayerProjection projection_layer = {
@@ -776,6 +762,11 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
+	struct wxrc_gl gl = {0};
+	if (!wxrc_gl_init(&gl)) {
+		return 1;
+	}
+
 	const char *wl_socket = wl_display_add_socket_auto(wl_display);
 	if (wl_socket == NULL) {
 		wlr_log(WLR_ERROR, "wl_display_add_socket_auto failed");
@@ -827,7 +818,7 @@ int main(int argc, char *argv[]) {
 			break;
 		}
 
-		if (!wxrc_xr_push_frame(&xr, frame_state.predictedDisplayTime,
+		if (!wxrc_xr_push_frame(&xr, &gl, frame_state.predictedDisplayTime,
 				xr_views, projection_views)) {
 			return 1;
 		}
@@ -836,6 +827,7 @@ int main(int argc, char *argv[]) {
 	wlr_log(WLR_DEBUG, "Tearing down XR instance");
 	free(projection_views);
 	free(xr_views);
+	wxrc_gl_finish(&gl);
 	wxrc_xr_finish(&xr);
 	wl_display_destroy_clients(wl_display);
 	wl_display_destroy(wl_display);
