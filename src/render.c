@@ -4,11 +4,20 @@
 #include "xr.h"
 
 static const GLchar vertex_shader_src[] =
+	"#version 100\n"
+	"\n"
+	"attribute vec3 in_pos;\n"
+	"\n"
 	"void main() {\n"
+	"    gl_Position = vec4(in_pos, 1.0);\n"
 	"}\n";
 
 static const GLchar fragment_shader_src[] =
+	"#version 100\n"
+	"precision mediump float;\n"
+	"\n"
 	"void main() {\n"
+	"    gl_FragColor = vec4(0.5, 0.0, 0.5, 1.0);"
 	"}\n";
 
 static GLuint wxrc_gl_compile_shader(GLuint type, const GLchar *src) {
@@ -79,16 +88,35 @@ void wxrc_gl_finish(struct wxrc_gl *gl) {
 
 void wxrc_gl_render_view(struct wxrc_gl *gl, struct wxrc_xr_view *view,
 		GLuint framebuffer, GLuint image) {
+	uint32_t width = view->config.recommendedImageRectWidth;
+	uint32_t height = view->config.recommendedImageRectHeight;
+
+	GLint in_pos = glGetAttribLocation(gl->shader_program, "in_pos");
+
 	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 
-	glViewport(0, 0, view->config.recommendedImageRectWidth,
-		view->config.recommendedImageRectHeight);
+	glViewport(0, 0, width, height);
 
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
 		image, 0);
 
 	glClearColor(0.0, 0.0, 1.0, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT);
+
+	glUseProgram(gl->shader_program);
+
+	const float points[] = {
+		0.0, 0.5, 0.0,
+		0.5, -0.5, 0.0,
+		-0.5, -0.5, 0.0,
+	};
+
+	glVertexAttribPointer(in_pos, 3, GL_FLOAT, GL_FALSE, 0, points);
+	glEnableVertexAttribArray(in_pos);
+
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 3);
+
+	glDisableVertexAttribArray(in_pos);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
