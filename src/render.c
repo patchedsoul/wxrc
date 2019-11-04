@@ -1,3 +1,4 @@
+#include <cglm/cglm.h>
 #include <stdlib.h>
 #include <wlr/util/log.h>
 #include "render.h"
@@ -6,10 +7,11 @@
 static const GLchar vertex_shader_src[] =
 	"#version 100\n"
 	"\n"
-	"attribute vec3 in_pos;\n"
+	"attribute vec3 pos;\n"
+	"uniform mat4 mvp;\n"
 	"\n"
 	"void main() {\n"
-	"	gl_Position = vec4(in_pos, 1.0);\n"
+	"	gl_Position = mvp * vec4(pos, 1.0);\n"
 	"}\n";
 
 static const GLchar fragment_shader_src[] =
@@ -96,7 +98,8 @@ void wxrc_gl_render_view(struct wxrc_gl *gl, struct wxrc_xr_view *view,
 	uint32_t width = view->config.recommendedImageRectWidth;
 	uint32_t height = view->config.recommendedImageRectHeight;
 
-	GLint in_pos = glGetAttribLocation(gl->shader_program, "in_pos");
+	GLint pos_loc = glGetAttribLocation(gl->shader_program, "pos");
+	GLint mvp_loc = glGetUniformLocation(gl->shader_program, "mvp");
 
 	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 
@@ -110,6 +113,21 @@ void wxrc_gl_render_view(struct wxrc_gl *gl, struct wxrc_xr_view *view,
 
 	glUseProgram(gl->shader_program);
 
+	mat4 model_matrix;
+	glm_rotate_make(model_matrix, -45.0, (vec3){ 1.0, 0.0, 0.0 });
+
+	mat4 view_matrix;
+	glm_translate_make(view_matrix, (vec3){ 0.0, 0.0, -3.0 });
+
+	mat4 projection_matrix;
+	glm_perspective_default((float)width / height, projection_matrix);
+
+	mat4 mvp_matrix = GLM_MAT4_IDENTITY_INIT;
+	glm_mat4_mul(projection_matrix, view_matrix, mvp_matrix);
+	glm_mat4_mul(mvp_matrix, model_matrix, mvp_matrix);
+
+	glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, (GLfloat *)mvp_matrix);
+
 	const float points[] = {
 		-0.5, -0.5, 0.0,
 		-0.5, 0.5, 0.0,
@@ -117,12 +135,12 @@ void wxrc_gl_render_view(struct wxrc_gl *gl, struct wxrc_xr_view *view,
 		0.5, 0.5, 0.0,
 	};
 
-	glVertexAttribPointer(in_pos, 3, GL_FLOAT, GL_FALSE, 0, points);
-	glEnableVertexAttribArray(in_pos);
+	glVertexAttribPointer(pos_loc, 3, GL_FLOAT, GL_FALSE, 0, points);
+	glEnableVertexAttribArray(pos_loc);
 
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-	glDisableVertexAttribArray(in_pos);
+	glDisableVertexAttribArray(pos_loc);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
