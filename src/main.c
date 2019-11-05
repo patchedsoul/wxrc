@@ -200,12 +200,20 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
+	struct wlr_renderer *renderer = wlr_backend_get_renderer(&backend->base);
+	wlr_renderer_init_wl_display(renderer, server.wl_display);
+
+	wlr_compositor_create(server.wl_display, renderer);
+
+	server.xdg_shell = wlr_xdg_shell_create(server.wl_display);
+
 	const char *wl_socket = wl_display_add_socket_auto(server.wl_display);
 	if (wl_socket == NULL) {
 		wlr_log(WLR_ERROR, "wl_display_add_socket_auto failed");
 		return 1;
 	}
-	wlr_log(WLR_INFO, "Wayland compositor listening on %s", wl_socket);
+	wlr_log(WLR_INFO, "Wayland compositor listening on WAYLAND_DISPLAY=%s",
+		wl_socket);
 
 	if (!wlr_backend_start(&backend->base)) {
 		wlr_log(WLR_ERROR, "wlr_backend_start failed");
