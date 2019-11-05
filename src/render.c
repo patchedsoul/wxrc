@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <wlr/util/log.h>
 #include "render.h"
-#include "xr.h"
+#include "backend.h"
 #include "xrutil.h"
 
 static const GLchar vertex_shader_src[] =
