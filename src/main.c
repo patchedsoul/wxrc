@@ -15,7 +15,7 @@
 #include "xrutil.h"
 
 static XrResult wxrc_xr_view_push_frame(struct wxrc_xr_view *view,
-		struct wxrc_gl *gl, XrView *xr_view,
+		struct wxrc_server *server, XrView *xr_view,
 		XrCompositionLayerProjectionView *projection_view) {
 	XrSwapchainImageAcquireInfo swapchain_image_acquire_info = {
 		.type = XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO,
@@ -53,7 +53,7 @@ static XrResult wxrc_xr_view_push_frame(struct wxrc_xr_view *view,
 	projection_view->subImage.imageRect.extent.height =
 		view->config.recommendedImageRectHeight;
 
-	wxrc_gl_render_view(gl, view, xr_view, view->framebuffers[buffer_index],
+	wxrc_gl_render_view(server, view, xr_view, view->framebuffers[buffer_index],
 		view->images[buffer_index].image);
 	glFinish();
 
@@ -70,9 +70,11 @@ static XrResult wxrc_xr_view_push_frame(struct wxrc_xr_view *view,
 	return r;
 }
 
-static bool wxrc_xr_push_frame(struct wxrc_xr_backend *backend, struct wxrc_gl *gl,
+static bool wxrc_xr_push_frame(struct wxrc_server *server,
 		XrTime predicted_display_time, XrView *xr_views,
 		XrCompositionLayerProjectionView *projection_views) {
+	struct wxrc_xr_backend *backend = server->backend;
+
 	for (uint32_t i = 0; i < backend->nviews; i++) {
 		xr_views[i].type = XR_TYPE_VIEW;
 		xr_views[i].next = NULL;
@@ -106,7 +108,8 @@ static bool wxrc_xr_push_frame(struct wxrc_xr_backend *backend, struct wxrc_gl *
 
 	for (uint32_t i = 0; i < backend->nviews; i++) {
 		struct wxrc_xr_view *view = &backend->views[i];
-		wxrc_xr_view_push_frame(view, gl, &xr_views[i], &projection_views[i]);
+		wxrc_xr_view_push_frame(view, server,
+			&xr_views[i], &projection_views[i]);
 	}
 
 	XrCompositionLayerProjection projection_layer = {
@@ -195,8 +198,7 @@ int main(int argc, char *argv[]) {
 	}
 	struct wxrc_xr_backend *backend = server.backend;
 
-	struct wxrc_gl gl = {0};
-	if (!wxrc_gl_init(&gl)) {
+	if (!wxrc_gl_init(&server.gl)) {
 		return 1;
 	}
 
@@ -263,7 +265,7 @@ int main(int argc, char *argv[]) {
 			break;
 		}
 
-		if (!wxrc_xr_push_frame(backend, &gl, frame_state.predictedDisplayTime,
+		if (!wxrc_xr_push_frame(&server, frame_state.predictedDisplayTime,
 				xr_views, projection_views)) {
 			return 1;
 		}
@@ -274,7 +276,7 @@ int main(int argc, char *argv[]) {
 	free(xr_views);
 	wl_event_source_remove(signals[0]);
 	wl_event_source_remove(signals[1]);
-	wxrc_gl_finish(&gl);
+	wxrc_gl_finish(&server.gl);
 	wl_display_destroy_clients(server.wl_display);
 	wl_display_destroy(server.wl_display);
 	return 0;

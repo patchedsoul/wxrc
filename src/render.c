@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <wlr/util/log.h>
 #include "render.h"
+#include "server.h"
 #include "backend.h"
 #include "xrutil.h"
 
@@ -117,8 +118,10 @@ static void wxrc_xr_quaternion_to_cglm(const XrQuaternionf *in, versor out) {
 	out[3] = in->w;
 }
 
-void wxrc_gl_render_view(struct wxrc_gl *gl, struct wxrc_xr_view *view,
+void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 		XrView *xr_view, GLuint framebuffer, GLuint image) {
+	struct wxrc_gl *gl = &server->gl;
+
 	uint32_t width = view->config.recommendedImageRectWidth;
 	uint32_t height = view->config.recommendedImageRectHeight;
 
