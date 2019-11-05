@@ -6,8 +6,6 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <wayland-client.h>
-#include <wayland-egl.h>
 #include <wayland-server.h>
 #include <wlr/render/egl.h>
 #include <wlr/util/log.h>
