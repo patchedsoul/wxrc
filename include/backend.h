@@ -1,3 +1,6 @@
+#ifndef _WXRC_BACKEND_H
+#define _WXRC_BACKEND_H
+
 #include <EGL/egl.h>
 #include <GLES2/gl2.h>
 #include <openxr/openxr.h>
@@ -36,3 +39,5 @@ struct wxrc_xr_backend {
 
 bool wxrc_backend_is_xr(struct wlr_backend *wlr_backend);
 struct wxrc_xr_backend *wxrc_xr_backend_create(struct wl_display *display);
+
+#endif
