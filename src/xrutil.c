@@ -1,3 +1,4 @@
+#include <math.h>
 #include <openxr/openxr.h>
 #include <stdio.h>
 #include <wlr/util/log.h>
@@ -302,4 +303,31 @@ const char *wxrc_xr_structure_type_str(XrStructureType t) {
 void wxrc_log_xr_result(const char *entrypoint, XrResult r) {
 	wlr_log(XR_FAILED(r) ? WLR_ERROR : WLR_DEBUG,
 			"%s: %s", entrypoint, wxrc_xr_result_str(r));
+}
+
+void wxrc_xr_projection_from_fov(const XrFovf *fov, float near_z, float far_z,
+		mat4 dest) {
+	float tan_left = tanf(fov->angleLeft);
+	float tan_right = tanf(fov->angleRight);
+
+	float tan_down = tanf(fov->angleDown);
+	float tan_up = tanf(fov->angleUp);
+
+	float tan_width = tan_right - tan_left;
+	float tan_height = tan_up - tan_down;
+
+	float a11 = 2 / tan_width;
+	float a22 = 2 / tan_height;
+
+	float a31 = (tan_right + tan_left) / tan_width;
+	float a32 = (tan_up + tan_down) / tan_height;
+	float a33 = -far_z / (far_z - near_z);
+
+	float a43 = -(far_z * near_z) / (far_z - near_z);
+
+	const mat4 mat = {
+		a11, 0, 0, 0, 0, a22, 0, 0, a31, a32, a33, -1, 0, 0, a43, 0,
+	};
+
+	memcpy(dest, mat, sizeof(mat));
 }

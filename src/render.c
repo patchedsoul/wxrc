@@ -3,6 +3,7 @@
 #include <wlr/util/log.h>
 #include "render.h"
 #include "xr.h"
+#include "xrutil.h"
 
 static const GLchar vertex_shader_src[] =
 	"#version 100\n"
@@ -162,8 +163,7 @@ void wxrc_gl_render_view(struct wxrc_gl *gl, struct wxrc_xr_view *view,
 	glm_mat4_inv(view_matrix, view_matrix);
 
 	mat4 projection_matrix;
-	/* TODO: use xr_view->fov */
-	glm_perspective_default((float)width / height, projection_matrix);
+	wxrc_xr_projection_from_fov(&xr_view->fov, 0.05, 100.0, projection_matrix);
 
 	mat4 mvp_matrix = GLM_MAT4_IDENTITY_INIT;
 	glm_mat4_mul(projection_matrix, view_matrix, mvp_matrix);
