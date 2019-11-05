@@ -47,6 +47,7 @@ wxrc_inc = include_directories('include')
 
 executable('wxrc',
 	files(
+		'src/backend.c',
 		'src/main.c',
 		'src/render.c',
 		'src/xrutil.c',

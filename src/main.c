@@ -792,7 +792,7 @@ int main(int argc, char *argv[]) {
 		wlr_log(WLR_ERROR, "wl_display_add_socket_auto failed");
 		return 1;
 	}
-	wlr_log(WLR_DEBUG, "Wayland compositor listening on %s", wl_socket);
+	wlr_log(WLR_INFO, "Wayland compositor listening on %s", wl_socket);
 
 	wlr_log(WLR_DEBUG, "Starting XR main loop");
 	XrView *xr_views = calloc(xr.nviews, sizeof(XrView));
