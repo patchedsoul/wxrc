@@ -11,6 +11,7 @@
 #include <wlr/util/log.h>
 #include "backend.h"
 #include "render.h"
+#include "server.h"
 #include "xrutil.h"
 
 static XrResult wxrc_xr_view_push_frame(struct wxrc_xr_view *view,
@@ -165,14 +166,17 @@ static int handle_signal(int sig, void *data) {
 }
 
 int main(int argc, char *argv[]) {
+	struct wxrc_server server = {0};
+
 	wlr_log_init(WLR_DEBUG, NULL);
 
-	struct wl_display *wl_display = wl_display_create();
-	if (wl_display == NULL) {
+	server.wl_display = wl_display_create();
+	if (server.wl_display == NULL) {
 		wlr_log(WLR_ERROR, "wl_display_create failed");
 		return 1;
 	}
-	struct wl_event_loop *wl_event_loop = wl_display_get_event_loop(wl_display);
+	struct wl_event_loop *wl_event_loop =
+		wl_display_get_event_loop(server.wl_display);
 
 	bool running = true;
 	struct wl_event_source *signals[] = {
@@ -184,18 +188,19 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	struct wxrc_xr_backend *backend = wxrc_xr_backend_create(wl_display);
-	if (backend == NULL) {
+	server.backend = wxrc_xr_backend_create(server.wl_display);
+	if (server.backend == NULL) {
 		wlr_log(WLR_ERROR, "wxrc_xr_backend_create failed");
 		return 1;
 	}
+	struct wxrc_xr_backend *backend = server.backend;
 
 	struct wxrc_gl gl = {0};
 	if (!wxrc_gl_init(&gl)) {
 		return 1;
 	}
 
-	const char *wl_socket = wl_display_add_socket_auto(wl_display);
+	const char *wl_socket = wl_display_add_socket_auto(server.wl_display);
 	if (wl_socket == NULL) {
 		wlr_log(WLR_ERROR, "wl_display_add_socket_auto failed");
 		return 1;
@@ -239,7 +244,7 @@ int main(int argc, char *argv[]) {
 			wxrc_xr_handle_event(&event, &running);
 		}
 
-		wl_display_flush_clients(wl_display);
+		wl_display_flush_clients(server.wl_display);
 		int ret = wl_event_loop_dispatch(wl_event_loop, 1);
 		if (ret < 0) {
 			wlr_log(WLR_ERROR, "wl_event_loop_dispatch failed");
@@ -262,7 +267,7 @@ int main(int argc, char *argv[]) {
 	wl_event_source_remove(signals[0]);
 	wl_event_source_remove(signals[1]);
 	wxrc_gl_finish(&gl);
-	wl_display_destroy_clients(wl_display);
-	wl_display_destroy(wl_display);
+	wl_display_destroy_clients(server.wl_display);
+	wl_display_destroy(server.wl_display);
 	return 0;
 }
