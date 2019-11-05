@@ -3,12 +3,13 @@
 #include <GLES2/gl2.h>
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <wayland-client.h>
 #include <wayland-egl.h>
 #include <wayland-server.h>
 #include <wlr/util/log.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include "render.h"
 #include "xr.h"
 #include "xrutil.h"
@@ -749,6 +750,12 @@ static void wxrc_xr_handle_event(XrEventDataBuffer *event, bool *running) {
 	}
 }
 
+static int handle_signal(int sig, void *data) {
+	bool *running_ptr = data;
+	*running_ptr = false;
+	return 0;
+}
+
 int main(int argc, char *argv[]) {
 	wlr_log_init(WLR_DEBUG, NULL);
 
@@ -758,6 +765,16 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 	struct wl_event_loop *wl_event_loop = wl_display_get_event_loop(wl_display);
+
+	bool running = true;
+	struct wl_event_source *signals[] = {
+		wl_event_loop_add_signal(wl_event_loop, SIGTERM, handle_signal, &running),
+		wl_event_loop_add_signal(wl_event_loop, SIGINT, handle_signal, &running),
+	};
+	if (signals[0] == NULL || signals[1] == NULL) {
+		wlr_log(WLR_ERROR, "wl_event_loop_add_signal failed");
+		return 1;
+	}
 
 	struct wxrc_xr xr = {0};
 	if (!wxrc_xr_init(&xr)) {
@@ -780,7 +797,6 @@ int main(int argc, char *argv[]) {
 	XrView *xr_views = calloc(xr.nviews, sizeof(XrView));
 	XrCompositionLayerProjectionView *projection_views =
 		calloc(xr.nviews, sizeof(XrCompositionLayerProjectionView));
-	bool running = true;
 	while (running) {
 		XrFrameWaitInfo frame_wait_info = {
 			.type = XR_TYPE_FRAME_WAIT_INFO,
@@ -829,6 +845,8 @@ int main(int argc, char *argv[]) {
 	wlr_log(WLR_DEBUG, "Tearing down XR instance");
 	free(projection_views);
 	free(xr_views);
+	wl_event_source_remove(signals[0]);
+	wl_event_source_remove(signals[1]);
 	wxrc_gl_finish(&gl);
 	wxrc_xr_finish(&xr);
 	wl_display_destroy_clients(wl_display);
