@@ -171,6 +171,7 @@ void wxrc_gl_render_view(struct wxrc_gl *gl, struct wxrc_xr_view *view,
 
 	glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, (GLfloat *)mvp_matrix);
 
+	size_t npoints = 4;
 	const float points[] = {
 		-0.5, -0.5, 0.0,
 		-0.5, 0.5, 0.0,
@@ -178,10 +179,12 @@ void wxrc_gl_render_view(struct wxrc_gl *gl, struct wxrc_xr_view *view,
 		0.5, 0.5, 0.0,
 	};
 
-	glVertexAttribPointer(pos_loc, 3, GL_FLOAT, GL_FALSE, 0, points);
+	GLint coords_per_point = sizeof(points) / sizeof(points[0]) / npoints;
+	glVertexAttribPointer(pos_loc, coords_per_point,
+		GL_FLOAT, GL_FALSE, 0, points);
 	glEnableVertexAttribArray(pos_loc);
 
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, npoints);
 
 	glDisableVertexAttribArray(pos_loc);
 
