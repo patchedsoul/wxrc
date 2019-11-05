@@ -9,7 +9,7 @@ struct wxrc_xr_view;
 struct wxrc_server;
 
 struct wxrc_gl {
-	GLuint shader_program;
+	GLuint grid_program;
 };
 
 bool wxrc_gl_init(struct wxrc_gl *gl);
