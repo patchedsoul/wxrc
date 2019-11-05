@@ -10,9 +10,16 @@ struct wxrc_xr_backend;
 
 struct wxrc_server {
 	struct wl_display *wl_display;
+
 	struct wxrc_xr_backend *backend;
-	struct wlr_xdg_shell *xdg_shell;
 	struct wxrc_gl gl;
+
+	struct wlr_compositor *compositor;
+	struct wlr_xdg_shell *xdg_shell;
+
+	struct wlr_surface *current_surface;
+
+	struct wl_listener new_surface;
 };
 
 #endif

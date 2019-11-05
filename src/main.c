@@ -168,6 +168,13 @@ static int handle_signal(int sig, void *data) {
 	return 0;
 }
 
+static void handle_new_surface(struct wl_listener *listener, void *data) {
+	struct wxrc_server *server = wl_container_of(listener, server, new_surface);
+	struct wlr_surface *surface = data;
+	server->current_surface = surface;
+	/* TODO: add destroy handler */
+}
+
 int main(int argc, char *argv[]) {
 	struct wxrc_server server = {0};
 
@@ -205,7 +212,9 @@ int main(int argc, char *argv[]) {
 	struct wlr_renderer *renderer = wlr_backend_get_renderer(&backend->base);
 	wlr_renderer_init_wl_display(renderer, server.wl_display);
 
-	wlr_compositor_create(server.wl_display, renderer);
+	server.compositor = wlr_compositor_create(server.wl_display, renderer);
+	server.new_surface.notify = handle_new_surface;
+	wl_signal_add(&server.compositor->events.new_surface, &server.new_surface);
 
 	server.xdg_shell = wlr_xdg_shell_create(server.wl_display);
 
@@ -268,6 +277,11 @@ int main(int argc, char *argv[]) {
 		if (!wxrc_xr_push_frame(&server, frame_state.predictedDisplayTime,
 				xr_views, projection_views)) {
 			return 1;
+		}
+
+		if (server.current_surface != NULL) {
+			struct timespec now = {0};
+			wlr_surface_send_frame_done(server.current_surface, &now);
 		}
 	}
 

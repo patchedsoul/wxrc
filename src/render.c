@@ -6,7 +6,7 @@
 #include "backend.h"
 #include "xrutil.h"
 
-static const GLchar vertex_shader_src[] =
+static const GLchar grid_vertex_shader_src[] =
 	"#version 100\n"
 	"\n"
 	"attribute vec3 pos;\n"
@@ -19,7 +19,7 @@ static const GLchar vertex_shader_src[] =
 	"	gl_Position = mvp * vec4(pos, 1.0);\n"
 	"}\n";
 
-static const GLchar fragment_shader_src[] =
+static const GLchar grid_fragment_shader_src[] =
 	"#version 100\n"
 	"precision mediump float;\n"
 	"\n"
@@ -37,6 +37,32 @@ static const GLchar fragment_shader_src[] =
 	"	} else {\n"
 	"		gl_FragColor = bg_color;\n"
 	"	}\n"
+	"}\n";
+
+static const GLchar texture_vertex_shader_src[] =
+	"#version 100\n"
+	"\n"
+	"attribute vec2 tex_coord;\n"
+	"uniform mat4 mvp;\n"
+	"\n"
+	"varying vec2 vertex_tex_coord;\n"
+	"\n"
+	"void main() {\n"
+	"	vertex_tex_coord = tex_coord;\n"
+	"	gl_Position = mvp * vec4(tex_coord, 0.0, 1.0);\n"
+	"}\n";
+
+static const GLchar texture_fragment_shader_src[] =
+	"#version 100\n"
+	"precision mediump float;\n"
+	"\n"
+	"uniform sampler2D tex;\n"
+	"\n"
+	"varying vec2 vertex_tex_coord;\n"
+	"\n"
+	"void main() {\n"
+	"	gl_FragColor = texture2D(tex, vertex_tex_coord);\n"
+	"	gl_FragColor.a = 1.0;\n"
 	"}\n";
 
 static GLuint wxrc_gl_compile_shader(GLuint type, const GLchar *src) {
@@ -67,9 +93,15 @@ bool wxrc_gl_init(struct wxrc_gl *gl) {
 	struct wxrc_shader_build_job jobs[] = {
 		{
 			.name = "grid",
-			.vertex_src = vertex_shader_src,
-			.fragment_src = fragment_shader_src,
+			.vertex_src = grid_vertex_shader_src,
+			.fragment_src = grid_fragment_shader_src,
 			.program_ptr = &gl->grid_program,
+		},
+		{
+			.name = "texture",
+			.vertex_src = texture_vertex_shader_src,
+			.fragment_src = texture_fragment_shader_src,
+			.program_ptr = &gl->texture_program,
 		},
 	};
 
@@ -116,6 +148,7 @@ bool wxrc_gl_init(struct wxrc_gl *gl) {
 
 void wxrc_gl_finish(struct wxrc_gl *gl) {
 	glDeleteProgram(gl->grid_program);
+	glDeleteProgram(gl->texture_program);
 }
 
 static void wxrc_xr_vector3f_to_cglm(const XrVector3f *in, vec3 out) {
@@ -172,6 +205,67 @@ static void render_grid(struct wxrc_gl *gl, mat4 vp_matrix) {
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, npoints);
 
 	glDisableVertexAttribArray(pos_loc);
+
+	glUseProgram(0);
+}
+
+static void render_surface(struct wxrc_gl *gl, mat4 vp_matrix,
+		struct wlr_surface *surface) {
+	struct wlr_buffer *buffer = surface->buffer;
+	if (buffer == NULL) {
+		return;
+	}
+	struct wlr_texture *tex = buffer->texture;
+	if (tex == NULL) {
+		return;
+	}
+	/* TODO: this is a hack */
+	struct wlr_gles2_texture *gles2_tex = (struct wlr_gles2_texture *)tex;
+	if (gles2_tex->type != WLR_GLES2_TEXTURE_GLTEX) {
+		return;
+	}
+
+	GLuint tex_id = gles2_tex->type == WLR_GLES2_TEXTURE_GLTEX ?
+		gles2_tex->gl_tex : gles2_tex->image_tex;
+
+	GLint tex_coord_loc = glGetAttribLocation(gl->texture_program, "tex_coord");
+	GLint mvp_loc = glGetUniformLocation(gl->texture_program, "mvp");
+	GLint tex_loc = glGetUniformLocation(gl->texture_program, "tex");
+
+	glUseProgram(gl->texture_program);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, tex_id);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glUniform1i(tex_loc, 0);
+
+	mat4 model_matrix;
+	glm_mat4_identity(model_matrix);
+	glm_translate(model_matrix, (vec3){ 0.0, 0.0, 2.0 });
+
+	mat4 mvp_matrix = GLM_MAT4_IDENTITY_INIT;
+	glm_mat4_mul(vp_matrix, model_matrix, mvp_matrix);
+
+	glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, (GLfloat *)mvp_matrix);
+
+	size_t npoints = 4;
+	const float points[] = {
+		-1.0, -1.0,
+		-1.0, 1.0,
+		1.0, -1.0,
+		1.0, 1.0,
+	};
+
+	GLint coords_per_point = sizeof(points) / sizeof(points[0]) / npoints;
+	glVertexAttribPointer(tex_coord_loc, coords_per_point,
+		GL_FLOAT, GL_FALSE, 0, points);
+	glEnableVertexAttribArray(tex_coord_loc);
+
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, npoints);
+
+	glDisableVertexAttribArray(tex_coord_loc);
+
 	glUseProgram(0);
 }
 
@@ -208,6 +302,10 @@ void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 	glm_mat4_mul(projection_matrix, view_matrix, vp_matrix);
 
 	render_grid(&server->gl, vp_matrix);
+
+	if (server->current_surface != NULL) {
+		render_surface(&server->gl, vp_matrix, server->current_surface);
+	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
