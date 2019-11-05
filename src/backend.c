@@ -12,6 +12,7 @@ struct wxrc_xr_backend *get_xr_backend_from_backend(
 }
 
 static bool backend_start(struct wlr_backend *backend) {
+	wlr_log(WLR_DEBUG, "Starting wlroots XR backend");
 	return true;
 }
 
@@ -56,7 +57,7 @@ static void handle_display_destroy(struct wl_listener *listener, void *data) {
 	backend_destroy(&backend->base);
 }
 
-struct wlr_backend *wxrc_xr_backend_create(struct wl_display *display) {
+struct wxrc_xr_backend *wxrc_xr_backend_create(struct wl_display *display) {
 	struct wxrc_xr_backend *backend = calloc(1, sizeof(*backend));
 	if (backend == NULL) {
 		wlr_log_errno(WLR_ERROR, "calloc failed");
@@ -91,5 +92,5 @@ struct wlr_backend *wxrc_xr_backend_create(struct wl_display *display) {
 	backend->local_display_destroy.notify = handle_display_destroy;
 	wl_display_add_destroy_listener(display, &backend->local_display_destroy);
 
-	return &backend->base;
+	return backend;
 }

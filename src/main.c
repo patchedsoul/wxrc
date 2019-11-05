@@ -9,7 +9,9 @@
 #include <wayland-client.h>
 #include <wayland-egl.h>
 #include <wayland-server.h>
+#include <wlr/render/egl.h>
 #include <wlr/util/log.h>
+#include "backend.h"
 #include "render.h"
 #include "xr.h"
 #include "xrutil.h"
@@ -246,56 +248,7 @@ XrViewConfigurationView *wxrc_xr_enumerate_stereo_config_views(
 }
 
 XrResult wxrc_create_xr_session(XrInstance instance,
-		XrSystemId sysid, XrSession *session) {
-	/* TODO: We need to be more sophisticated about how we go about setting up
-	 * the session's graphics binding */
-	struct wl_display *display = wl_display_connect(NULL);
-	if (!display) {
-		wlr_log(WLR_ERROR, "Unable to connect to Wayland display");
-		return XR_ERROR_INITIALIZATION_FAILED;
-	}
-
-	EGLDisplay egl_display = eglGetDisplay((EGLNativeDisplayType)display);
-	if (egl_display == EGL_NO_DISPLAY) {
-		wlr_log(WLR_ERROR, "eglGetDisplay failed");
-		return XR_ERROR_INITIALIZATION_FAILED;
-	}
-
-	EGLint egl_major, egl_minor;
-	if (!eglInitialize(egl_display, &egl_major, &egl_minor)) {
-		wlr_log(WLR_ERROR, "eglInitialize failed");
-		return XR_ERROR_INITIALIZATION_FAILED;
-	}
-
-	EGLint egl_config_attribs[] = {
-		EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
-		EGL_RED_SIZE, 8,
-		EGL_GREEN_SIZE, 8,
-		EGL_BLUE_SIZE, 8,
-		EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
-		EGL_NONE,
-	};
-	EGLint egl_n_configs = 0;
-	EGLConfig egl_config;
-	eglChooseConfig(egl_display, egl_config_attribs, &egl_config, 1,
-		&egl_n_configs);
-	if (egl_n_configs == 0) {
-		wlr_log(WLR_ERROR, "eglChooseConfig failed");
-		return XR_ERROR_INITIALIZATION_FAILED;
-	}
-
-	EGLint gles_version = 2;
-	EGLint egl_context_attribs[] = {
-		EGL_CONTEXT_CLIENT_VERSION, gles_version,
-		EGL_NONE,
-	};
-	EGLContext egl_context = eglCreateContext(egl_display, egl_config,
-		EGL_NO_CONTEXT, egl_context_attribs);
-	if (egl_context == EGL_NO_CONTEXT) {
-		wlr_log(WLR_ERROR, "eglCreateContext failed");
-		return XR_ERROR_INITIALIZATION_FAILED;
-	}
-
+		XrSystemId sysid, XrSession *session, struct wlr_egl *egl) {
 	PFN_xrGetOpenGLESGraphicsRequirementsKHR xrGetOpenGLESGraphicsRequirementsKHR;
 	XrResult r = xrGetInstanceProcAddr(instance, "xrGetOpenGLESGraphicsRequirementsKHR",
 		(PFN_xrVoidFunction *)&xrGetOpenGLESGraphicsRequirementsKHR);
@@ -321,6 +274,7 @@ XrResult wxrc_create_xr_session(XrInstance instance,
 			XR_VERSION_MINOR(reqs.maxApiVersionSupported),
 			XR_VERSION_PATCH(reqs.maxApiVersionSupported));
 
+	EGLint gles_version = 2;
 	if (XR_VERSION_MAJOR(reqs.minApiVersionSupported) > gles_version ||
 			XR_VERSION_MAJOR(reqs.maxApiVersionSupported) < gles_version) {
 		wlr_log(WLR_ERROR, "XR runtime does not support a suitable GL version");
@@ -330,9 +284,9 @@ XrResult wxrc_create_xr_session(XrInstance instance,
 	XrGraphicsBindingEGLMND gfx = {
 		.type = XR_TYPE_GRAPHICS_BINDING_EGL_MND,
 		.getProcAddress = eglGetProcAddress,
-		.display = egl_display,
-		.config = egl_config,
-		.context = egl_context,
+		.display = egl->display,
+		.config = egl->config,
+		.context = egl->context,
 	};
 
 	XrSessionCreateInfo sessinfo = {
@@ -523,7 +477,7 @@ error:
 	return NULL;
 }
 
-static bool wxrc_xr_init(struct wxrc_xr *xr) {
+static bool wxrc_xr_init(struct wxrc_xr *xr, struct wxrc_xr_backend *backend) {
 	if (XR_FAILED(wxrc_xr_enumerate_layer_props())) {
 		return false;
 	}
@@ -552,7 +506,7 @@ static bool wxrc_xr_init(struct wxrc_xr *xr) {
 		return false;
 	}
 
-	r = wxrc_create_xr_session(xr->instance, sysid, &xr->session);
+	r = wxrc_create_xr_session(xr->instance, sysid, &xr->session, &backend->egl);
 	if (XR_FAILED(r)) {
 		return false;
 	}
@@ -777,8 +731,14 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
+	struct wxrc_xr_backend *backend = wxrc_xr_backend_create(wl_display);
+	if (backend == NULL) {
+		wlr_log(WLR_ERROR, "wxrc_xr_backend_create failed");
+		return 1;
+	}
+
 	struct wxrc_xr xr = {0};
-	if (!wxrc_xr_init(&xr)) {
+	if (!wxrc_xr_init(&xr, backend)) {
 		return 1;
 	}
 
