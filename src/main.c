@@ -284,8 +284,9 @@ XrResult wxrc_create_xr_session(XrInstance instance,
 		return XR_ERROR_INITIALIZATION_FAILED;
 	}
 
+	EGLint gles_version = 2;
 	EGLint egl_context_attribs[] = {
-		EGL_CONTEXT_CLIENT_VERSION, 2,
+		EGL_CONTEXT_CLIENT_VERSION, gles_version,
 		EGL_NONE,
 	};
 	EGLContext egl_context = eglCreateContext(egl_display, egl_config,
@@ -320,8 +321,8 @@ XrResult wxrc_create_xr_session(XrInstance instance,
 			XR_VERSION_MINOR(reqs.maxApiVersionSupported),
 			XR_VERSION_PATCH(reqs.maxApiVersionSupported));
 
-	if (XR_VERSION_MAJOR(reqs.minApiVersionSupported) > 2 ||
-			XR_VERSION_MAJOR(reqs.maxApiVersionSupported) < 2) {
+	if (XR_VERSION_MAJOR(reqs.minApiVersionSupported) > gles_version ||
+			XR_VERSION_MAJOR(reqs.maxApiVersionSupported) < gles_version) {
 		wlr_log(WLR_ERROR, "XR runtime does not support a suitable GL version");
 		return XR_ERROR_INITIALIZATION_FAILED;
 	}
