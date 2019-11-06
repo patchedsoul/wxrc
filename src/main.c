@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <unistd.h>
 #include <wayland-server.h>
 #include <wlr/render/egl.h>
 #include <wlr/util/log.h>
@@ -181,6 +182,19 @@ int main(int argc, char *argv[]) {
 
 	wlr_log_init(WLR_DEBUG, NULL);
 
+	const char *startup_cmd = NULL;
+	int opt;
+	while ((opt = getopt(argc, argv, "s:h")) != -1) {
+		switch (opt) {
+		case 's':
+			startup_cmd = optarg;
+			break;
+		default:
+			fprintf(stderr, "usage: %s [-s startup-cmd]\n", argv[0]);
+			return 1;
+		}
+	}
+
 	server.wl_display = wl_display_create();
 	if (server.wl_display == NULL) {
 		wlr_log(WLR_ERROR, "wl_display_create failed");
@@ -230,6 +244,19 @@ int main(int argc, char *argv[]) {
 	if (!wlr_backend_start(&backend->base)) {
 		wlr_log(WLR_ERROR, "wlr_backend_start failed");
 		return 1;
+	}
+
+	setenv("WAYLAND_DISPLAY", wl_socket, true);
+	if (startup_cmd != NULL) {
+		pid_t pid = fork();
+		if (pid < 0) {
+			wlr_log_errno(WLR_ERROR, "fork failed");
+			return 1;
+		} else if (pid == 0) {
+			execl("/bin/sh", "/bin/sh", "-c", startup_cmd, (void *)NULL);
+			wlr_log_errno(WLR_ERROR, "execl failed");
+			exit(1);
+		}
 	}
 
 	wlr_log(WLR_DEBUG, "Starting XR main loop");
