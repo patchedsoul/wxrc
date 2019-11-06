@@ -225,6 +225,9 @@ static void render_surface(struct wxrc_gl *gl, mat4 vp_matrix,
 		return;
 	}
 
+	int width, height;
+	wlr_texture_get_size(tex, &width, &height);
+
 	GLint tex_coord_loc = glGetAttribLocation(gl->texture_program, "tex_coord");
 	GLint mvp_loc = glGetUniformLocation(gl->texture_program, "mvp");
 	GLint tex_loc = glGetUniformLocation(gl->texture_program, "tex");
@@ -237,8 +240,12 @@ static void render_surface(struct wxrc_gl *gl, mat4 vp_matrix,
 	glTexParameteri(gles2_tex->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glUniform1i(tex_loc, 0);
 
+	float scale_x = -width / 300.0;
+	float scale_y = -height / 300.0;
+
 	mat4 model_matrix;
 	glm_mat4_identity(model_matrix);
+	glm_scale(model_matrix, (vec3){ scale_x, scale_y, 1.0 });
 	glm_translate(model_matrix, (vec3){ 0.0, 0.0, 2.0 });
 
 	mat4 mvp_matrix = GLM_MAT4_IDENTITY_INIT;
