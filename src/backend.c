@@ -506,6 +506,45 @@ static void wxrc_xr_view_finish(struct wxrc_xr_view *view) {
 	xrDestroySwapchain(view->swapchain);
 }
 
+static const struct wlr_output_impl output_impl;
+
+static struct wxrc_xr_output *xr_output_from_output(
+		struct wlr_output *wlr_output) {
+	assert(wlr_output->impl == &output_impl);
+	return (struct wxrc_xr_output *)wlr_output;
+}
+
+static bool output_attach_render(struct wlr_output *wlr_output,
+		int *buffer_age) {
+	return false; /* TODO */
+}
+
+static bool output_commit(struct wlr_output *wlr_output) {
+	return false; /* TODO */
+}
+
+static const struct wlr_output_impl output_impl = {
+	.attach_render = output_attach_render,
+	.commit = output_commit,
+};
+
+static void wxrc_xr_output_init(struct wxrc_xr_backend *backend,
+		struct wxrc_xr_output *output) {
+	struct wlr_output *wlr_output = &output->base;
+
+	wlr_output_init(wlr_output, &backend->base, &output_impl,
+		backend->local_display);
+
+	static size_t output_num = 0;
+	strncpy(wlr_output->make, "xr", sizeof(wlr_output->make));
+	strncpy(wlr_output->model, "xr", sizeof(wlr_output->model));
+	snprintf(wlr_output->name, sizeof(wlr_output->name), "XR-%zu",
+		++output_num);
+
+	wlr_output_update_enabled(wlr_output, true);
+	wl_signal_emit(&backend->base.events.new_output, wlr_output);
+}
+
 static bool backend_start(struct wlr_backend *wlr_backend) {
 	struct wxrc_xr_backend *backend = get_xr_backend_from_backend(wlr_backend);
 	assert(!backend->started);
@@ -553,6 +592,8 @@ static bool backend_start(struct wlr_backend *wlr_backend) {
 
 	free(view_configs);
 	backend->started = true;
+
+	wxrc_xr_output_init(backend, &backend->output);
 
 	return true;
 }
@@ -615,6 +656,8 @@ struct wxrc_xr_backend *wxrc_xr_backend_create(struct wl_display *display) {
 		return NULL;
 	}
 	wlr_backend_init(&backend->base, &backend_impl);
+
+	backend->local_display = display;
 
 	/* TODO: support more platforms */
 	backend->remote_display = wl_display_connect(NULL);

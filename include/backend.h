@@ -6,6 +6,7 @@
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
 #include <wlr/backend/interface.h>
+#include <wlr/interfaces/wlr_output.h>
 
 struct wxrc_xr_view {
 	XrViewConfigurationView config;
@@ -16,9 +17,14 @@ struct wxrc_xr_view {
 	GLuint *framebuffers;
 };
 
+struct wxrc_xr_output {
+	struct wlr_output base;
+};
+
 struct wxrc_xr_backend {
 	struct wlr_backend base;
 
+	struct wl_display *local_display;
 	bool started;
 
 	struct wl_display *remote_display;
@@ -33,6 +39,8 @@ struct wxrc_xr_backend {
 
 	uint32_t nviews;
 	struct wxrc_xr_view *views;
+
+	struct wxrc_xr_output output;
 
 	struct wl_listener local_display_destroy;
 };
