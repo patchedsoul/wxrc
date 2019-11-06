@@ -9,6 +9,8 @@
 #include <time.h>
 #include <unistd.h>
 #include <wayland-server.h>
+#include <wlr/types/wlr_data_device.h>
+#include <wlr/types/wlr_seat.h>
 #include <wlr/render/egl.h>
 #include <wlr/util/log.h>
 #include "backend.h"
@@ -266,6 +268,9 @@ int main(int argc, char *argv[]) {
 	wlr_renderer_init_wl_display(renderer, server.wl_display);
 
 	wlr_compositor_create(server.wl_display, renderer);
+	wlr_data_device_manager_create(server.wl_display);
+
+	server.seat = wlr_seat_create(server.wl_display, "seat0");
 
 	wl_list_init(&server.views);
 	wxrc_xdg_shell_init(&server);

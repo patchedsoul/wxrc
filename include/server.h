@@ -17,6 +17,7 @@ struct wxrc_server {
 	XrView *xr_views;
 
 	struct wlr_compositor *compositor;
+	struct wlr_seat *seat;
 	struct wlr_xdg_shell *xdg_shell;
 
 	struct wl_list views;
