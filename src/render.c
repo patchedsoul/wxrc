@@ -256,11 +256,6 @@ static void render_surface(struct wxrc_gl *gl, mat4 vp_matrix,
 
 	struct wlr_gles2_texture_attribs attribs = {0};
 	wlr_gles2_texture_get_attribs(tex, &attribs);
-	/* TODO: add support for inverted_y */
-	if (attribs.inverted_y) {
-		wlr_log(WLR_DEBUG, "inverted-Y textures aren't yet implemented");
-		return;
-	}
 
 	int width, height;
 	wlr_texture_get_size(tex, &width, &height);
@@ -296,12 +291,19 @@ static void render_surface(struct wxrc_gl *gl, mat4 vp_matrix,
 	}
 
 	float scale_x = -width / 300.0;
-	float scale_y = -height / 300.0;
+	float scale_y = (height / 300.0) * (attribs.inverted_y ? 1 : -1);
 
 	mat4 model_matrix;
 	glm_mat4_identity(model_matrix);
 	glm_scale(model_matrix, (vec3){ scale_x, scale_y, 1.0 });
-	glm_translate(model_matrix, (vec3){ -0.5, -0.5, 2.0 });
+
+	glm_translate(model_matrix, (vec3){ 0, 0, -2.0 });
+	glm_rotate(model_matrix, 0, (vec3){ 1, 0, 0 }); /* x */
+	glm_rotate(model_matrix, 0, (vec3){ 0, 1, 0 }); /* y */
+	glm_rotate(model_matrix, 0, (vec3){ 0, 0, 1 }); /* z */
+
+	/* Re-origin the view to the center */
+	glm_translate(model_matrix, (vec3){ -0.5, -0.5, 0.0 });
 
 	mat4 mvp_matrix = GLM_MAT4_IDENTITY_INIT;
 	glm_mat4_mul(vp_matrix, model_matrix, mvp_matrix);
