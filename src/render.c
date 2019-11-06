@@ -364,9 +364,10 @@ void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 
 	render_grid(&server->gl, vp_matrix);
 
-	if (server->current_surface != NULL) {
-		render_surface(&server->gl, vp_matrix, server->current_surface);
-	}
+	struct wxrc_toplevel *toplevel;
+	wl_list_for_each(toplevel, &server->toplevels, link) {
+		render_surface(&server->gl, vp_matrix, toplevel->xdg_surface->surface);
+	};
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
