@@ -281,7 +281,7 @@ static void render_view(struct wxrc_gl *gl,
 		glUniform1i(has_alpha_loc, attribs.has_alpha);
 	}
 
-	float scale_x = -width / 300.0;
+	float scale_x = width / 300.0;
 	float scale_y = (height / 300.0) * (attribs.inverted_y ? 1 : -1);
 
 	mat4 model_matrix;
