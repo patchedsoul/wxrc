@@ -33,6 +33,7 @@ static void handle_xdg_surface_map(struct wl_listener *listener, void *data) {
 	wlr_log(WLR_DEBUG, "Spawning view at <%f,%f,%f>",
 			pos[0], pos[1], pos[2]);
 
+	wlr_xdg_toplevel_set_activated(view->xdg_surface, true);
 	view->base.mapped = true;
 }
 
