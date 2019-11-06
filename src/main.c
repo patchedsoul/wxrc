@@ -157,17 +157,38 @@ static int handle_signal(int sig, void *data) {
 	return 0;
 }
 
-static void handle_new_surface(struct wl_listener *listener, void *data) {
-	struct wxrc_server *server = wl_container_of(listener, server, new_surface);
-	struct wlr_surface *surface = data;
-	if (server->current_surface == NULL) {
-		server->current_surface = surface;
-		/* TODO: add destroy handler */
+static void toplevel_handle_xdg_surface_destroy(struct wl_listener *listener,
+		void *data) {
+	struct wxrc_toplevel *toplevel =
+		wl_container_of(listener, toplevel, xdg_surface_destroy);
+	wl_list_remove(&toplevel->link);
+	wl_list_remove(&toplevel->xdg_surface_destroy.link);
+	free(toplevel);
+}
+
+static void handle_new_xdg_surface(struct wl_listener *listener, void *data) {
+	struct wxrc_server *server =
+		wl_container_of(listener, server, new_xdg_surface);
+	struct wlr_xdg_surface *xdg_surface = data;
+
+	if (xdg_surface->role != WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
+		return;
 	}
+
+	struct wxrc_toplevel *toplevel = calloc(1, sizeof(*toplevel));
+	if (toplevel == NULL) {
+		return;
+	}
+	toplevel->xdg_surface = xdg_surface;
+	wl_list_insert(&server->toplevels, &toplevel->link);
+
+	toplevel->xdg_surface_destroy.notify = toplevel_handle_xdg_surface_destroy;
+	wl_signal_add(&xdg_surface->events.destroy, &toplevel->xdg_surface_destroy);
 }
 
 int main(int argc, char *argv[]) {
 	struct wxrc_server server = {0};
+	wl_list_init(&server.toplevels);
 
 	wlr_log_init(WLR_DEBUG, NULL);
 
@@ -217,10 +238,11 @@ int main(int argc, char *argv[]) {
 	wlr_renderer_init_wl_display(renderer, server.wl_display);
 
 	server.compositor = wlr_compositor_create(server.wl_display, renderer);
-	server.new_surface.notify = handle_new_surface;
-	wl_signal_add(&server.compositor->events.new_surface, &server.new_surface);
 
 	server.xdg_shell = wlr_xdg_shell_create(server.wl_display);
+	server.new_xdg_surface.notify = handle_new_xdg_surface;
+	wl_signal_add(&server.xdg_shell->events.new_surface,
+		&server.new_xdg_surface);
 
 	const char *wl_socket = wl_display_add_socket_auto(server.wl_display);
 	if (wl_socket == NULL) {
@@ -292,10 +314,11 @@ int main(int argc, char *argv[]) {
 			return 1;
 		}
 
-		if (server.current_surface != NULL) {
-			struct timespec now;
-			clock_gettime(CLOCK_MONOTONIC, &now);
-			wlr_surface_send_frame_done(server.current_surface, &now);
+		struct timespec now;
+		clock_gettime(CLOCK_MONOTONIC, &now);
+		struct wxrc_toplevel *toplevel;
+		wl_list_for_each(toplevel, &server.toplevels, link) {
+			wlr_surface_send_frame_done(toplevel->xdg_surface->surface, &now);
 		}
 	}
 
