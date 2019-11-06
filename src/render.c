@@ -358,7 +358,7 @@ void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 	render_grid(&server->gl, vp_matrix);
 
 	struct wxrc_view *wxrc_view;
-	wl_list_for_each(wxrc_view, &server->views, link) {
+	wl_list_for_each_reverse(wxrc_view, &server->views, link) {
 		if (!wxrc_view->mapped) {
 			continue;
 		}
