@@ -160,8 +160,10 @@ static int handle_signal(int sig, void *data) {
 static void handle_new_surface(struct wl_listener *listener, void *data) {
 	struct wxrc_server *server = wl_container_of(listener, server, new_surface);
 	struct wlr_surface *surface = data;
-	server->current_surface = surface;
-	/* TODO: add destroy handler */
+	if (server->current_surface == NULL) {
+		server->current_surface = surface;
+		/* TODO: add destroy handler */
+	}
 }
 
 int main(int argc, char *argv[]) {
