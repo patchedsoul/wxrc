@@ -38,7 +38,6 @@ cglm = dependency('cglm')
 egl = dependency('egl')
 glesv2 = dependency('glesv2')
 openxr = dependency('openxr')
-wayland_client = dependency('wayland-client')
 wayland_server = dependency('wayland-server')
 wayland_protocols = dependency('wayland-protocols')
 
@@ -73,7 +72,6 @@ executable('wxrc',
 		glesv2,
 		openxr,
 		wlroots,
-		wayland_client,
 		wayland_server,
 		wxrc_protocols,
 	],

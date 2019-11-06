@@ -1,6 +1,5 @@
 #include <assert.h>
 #include <stdlib.h>
-#include <wayland-client.h>
 #include <wlr/render/wlr_renderer.h>
 #include <wlr/util/log.h>
 #include "backend.h"
@@ -566,7 +565,7 @@ static void backend_destroy(struct wlr_backend *wlr_backend) {
 
 	wl_signal_emit(&backend->base.events.destroy, &backend->base);
 
-	wl_list_remove(&backend->local_display_destroy.link);
+	wl_list_remove(&backend->display_destroy.link);
 
 	if (backend->started) {
 		for (uint32_t i = 0; i < backend->nviews; i++) {
@@ -580,8 +579,6 @@ static void backend_destroy(struct wlr_backend *wlr_backend) {
 
 	wlr_renderer_destroy(backend->renderer);
 	wlr_egl_finish(&backend->egl);
-
-	wl_display_disconnect(backend->remote_display);
 
 	free(backend);
 }
@@ -604,7 +601,7 @@ bool wxrc_backend_is_xr(struct wlr_backend *wlr_backend) {
 
 static void handle_display_destroy(struct wl_listener *listener, void *data) {
 	struct wxrc_xr_backend *backend =
-		wl_container_of(listener, backend, local_display_destroy);
+		wl_container_of(listener, backend, display_destroy);
 	backend_destroy(&backend->base);
 }
 
@@ -616,27 +613,17 @@ struct wxrc_xr_backend *wxrc_xr_backend_create(struct wl_display *display) {
 	}
 	wlr_backend_init(&backend->base, &backend_impl);
 
-	/* TODO: support more platforms */
-	backend->remote_display = wl_display_connect(NULL);
-	if (backend->remote_display == NULL) {
-		wlr_log(WLR_ERROR, "wl_display_connect failed");
-		return NULL;
-	}
-
-	EGLint egl_config_attribs[] = {
-		EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
+	static const EGLint egl_config_attribs[] = {
+		EGL_SURFACE_TYPE, EGL_PBUFFER_BIT,
 		EGL_RED_SIZE, 1,
 		EGL_GREEN_SIZE, 1,
 		EGL_BLUE_SIZE, 1,
-		EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
 		EGL_NONE,
 	};
 	backend->renderer = wlr_renderer_autocreate(&backend->egl,
-		EGL_PLATFORM_WAYLAND_EXT, backend->remote_display, egl_config_attribs,
-		WL_SHM_FORMAT_ARGB8888);
+		EGL_PLATFORM_SURFACELESS_MESA, NULL, (EGLint *)egl_config_attribs, 0);
 	if (backend->renderer == NULL) {
 		wlr_log(WLR_ERROR, "wlr_renderer_autocreate failed");
-		wl_display_disconnect(backend->remote_display);
 		return NULL;
 	}
 
@@ -644,8 +631,8 @@ struct wxrc_xr_backend *wxrc_xr_backend_create(struct wl_display *display) {
 		return NULL;
 	}
 
-	backend->local_display_destroy.notify = handle_display_destroy;
-	wl_display_add_destroy_listener(display, &backend->local_display_destroy);
+	backend->display_destroy.notify = handle_display_destroy;
+	wl_display_add_destroy_listener(display, &backend->display_destroy);
 
 	return backend;
 }
