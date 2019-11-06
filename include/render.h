@@ -2,6 +2,8 @@
 #define _WXRC_RENDER_H
 
 #include <stdbool.h>
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
 #include <GLES2/gl2.h>
 #include <openxr/openxr.h>
 #include <wlr/render/wlr_texture.h>
