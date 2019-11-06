@@ -164,6 +164,63 @@ static void handle_new_surface(struct wl_listener *listener, void *data) {
 	/* TODO: add destroy handler */
 }
 
+static void send_geometry(struct wl_resource *resource) {
+	wl_output_send_geometry(resource, 0, 0,
+		1200, 1200, WL_OUTPUT_SUBPIXEL_UNKNOWN,
+		"wxrc", "wxrc", WL_OUTPUT_TRANSFORM_NORMAL);
+}
+
+static void send_all_modes(struct wl_resource *resource) {
+	wl_output_send_mode(resource, WL_OUTPUT_MODE_CURRENT,
+		1920, 1080, 144000);
+}
+
+static void send_scale(struct wl_resource *resource) {
+	uint32_t version = wl_resource_get_version(resource);
+	if (version >= WL_OUTPUT_SCALE_SINCE_VERSION) {
+		wl_output_send_scale(resource, 1);
+	}
+}
+
+static void send_done(struct wl_resource *resource) {
+	uint32_t version = wl_resource_get_version(resource);
+	if (version >= WL_OUTPUT_DONE_SINCE_VERSION) {
+		wl_output_send_done(resource);
+	}
+}
+
+static void output_handle_resource_destroy(struct wl_resource *resource) {
+	// This space deliberately left blank
+}
+
+static void output_handle_release(struct wl_client *client,
+		struct wl_resource *resource) {
+	wl_resource_destroy(resource);
+}
+
+static const struct wl_output_interface output_impl = {
+	.release = output_handle_release,
+};
+
+static void output_bind(struct wl_client *wl_client, void *data,
+		uint32_t version, uint32_t id) {
+	struct wlr_output *output = data;
+
+	struct wl_resource *resource = wl_resource_create(wl_client,
+		&wl_output_interface, version, id);
+	if (resource == NULL) {
+		wl_client_post_no_memory(wl_client);
+		return;
+	}
+	wl_resource_set_implementation(resource, &output_impl, output,
+		output_handle_resource_destroy);
+
+	send_geometry(resource);
+	send_all_modes(resource);
+	send_scale(resource);
+	send_done(resource);
+}
+
 int main(int argc, char *argv[]) {
 	struct wxrc_server server = {0};
 
@@ -245,6 +302,9 @@ int main(int argc, char *argv[]) {
 			exit(1);
 		}
 	}
+
+	wl_global_create(server.wl_display, &wl_output_interface,
+			3, NULL, output_bind);
 
 	wlr_log(WLR_DEBUG, "Starting XR main loop");
 	XrView *xr_views = calloc(backend->nviews, sizeof(XrView));
