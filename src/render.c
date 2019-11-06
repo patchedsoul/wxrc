@@ -52,7 +52,7 @@ static const GLchar texture_vertex_shader_src[] =
 	"	gl_Position = mvp * vec4(tex_coord, 0.0, 1.0);\n"
 	"}\n";
 
-static const GLchar texture_fragment_shader_src[] =
+static const GLchar texture_rgb_fragment_shader_src[] =
 	"#version 100\n"
 	"precision mediump float;\n"
 	"\n"
@@ -101,10 +101,10 @@ bool wxrc_gl_init(struct wxrc_gl *gl) {
 			.program_ptr = &gl->grid_program,
 		},
 		{
-			.name = "texture",
+			.name = "texture_rgb",
 			.vertex_src = texture_vertex_shader_src,
-			.fragment_src = texture_fragment_shader_src,
-			.program_ptr = &gl->texture_program,
+			.fragment_src = texture_rgb_fragment_shader_src,
+			.program_ptr = &gl->texture_rgb_program,
 		},
 	};
 
@@ -151,7 +151,7 @@ bool wxrc_gl_init(struct wxrc_gl *gl) {
 
 void wxrc_gl_finish(struct wxrc_gl *gl) {
 	glDeleteProgram(gl->grid_program);
-	glDeleteProgram(gl->texture_program);
+	glDeleteProgram(gl->texture_rgb_program);
 }
 
 static void wxrc_xr_vector3f_to_cglm(const XrVector3f *in, vec3 out) {
@@ -171,11 +171,13 @@ static const float fg_color[] = { 1.0, 1.0, 1.0, 1.0 };
 static const float bg_color[] = { 0.08, 0.07, 0.16, 1.0 };
 
 static void render_grid(struct wxrc_gl *gl, mat4 vp_matrix) {
-	GLint pos_loc = glGetAttribLocation(gl->grid_program, "pos");
-	GLint mvp_loc = glGetUniformLocation(gl->grid_program, "mvp");
-	GLint fg_color_loc = glGetUniformLocation(gl->grid_program, "fg_color");
+	GLuint prog = gl->grid_program;
 
-	glUseProgram(gl->grid_program);
+	GLint pos_loc = glGetAttribLocation(prog, "pos");
+	GLint mvp_loc = glGetUniformLocation(prog, "mvp");
+	GLint fg_color_loc = glGetUniformLocation(prog, "fg_color");
+
+	glUseProgram(prog);
 
 	glUniform4fv(fg_color_loc, 1, (GLfloat *)fg_color);
 
@@ -234,12 +236,14 @@ static void render_surface(struct wxrc_gl *gl, mat4 vp_matrix,
 	int width, height;
 	wlr_texture_get_size(tex, &width, &height);
 
-	GLint tex_coord_loc = glGetAttribLocation(gl->texture_program, "tex_coord");
-	GLint mvp_loc = glGetUniformLocation(gl->texture_program, "mvp");
-	GLint tex_loc = glGetUniformLocation(gl->texture_program, "tex");
-	GLint has_alpha_loc = glGetUniformLocation(gl->texture_program, "has_alpha");
+	GLuint prog = gl->texture_rgb_program;
 
-	glUseProgram(gl->texture_program);
+	GLint tex_coord_loc = glGetAttribLocation(prog, "tex_coord");
+	GLint mvp_loc = glGetUniformLocation(prog, "mvp");
+	GLint tex_loc = glGetUniformLocation(prog, "tex");
+	GLint has_alpha_loc = glGetUniformLocation(prog, "has_alpha");
+
+	glUseProgram(prog);
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(attribs.target, attribs.tex);
