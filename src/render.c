@@ -233,8 +233,8 @@ static void render_surface(struct wxrc_gl *gl, mat4 vp_matrix,
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(gles2_tex->target, gles2_tex->tex);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(gles2_tex->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(gles2_tex->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glUniform1i(tex_loc, 0);
 
 	mat4 model_matrix;
@@ -248,9 +248,9 @@ static void render_surface(struct wxrc_gl *gl, mat4 vp_matrix,
 
 	size_t npoints = 4;
 	const float points[] = {
-		-1.0, -1.0,
-		-1.0, 1.0,
-		1.0, -1.0,
+		0.0, 0.0,
+		0.0, 1.0,
+		1.0, 0.0,
 		1.0, 1.0,
 	};
 
