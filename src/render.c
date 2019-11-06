@@ -221,12 +221,9 @@ static void render_surface(struct wxrc_gl *gl, mat4 vp_matrix,
 	}
 	/* TODO: this is a hack */
 	struct wlr_gles2_texture *gles2_tex = (struct wlr_gles2_texture *)tex;
-	if (gles2_tex->type != WLR_GLES2_TEXTURE_GLTEX) {
+	if (gles2_tex->target != GL_TEXTURE_2D) {
 		return;
 	}
-
-	GLuint tex_id = gles2_tex->type == WLR_GLES2_TEXTURE_GLTEX ?
-		gles2_tex->gl_tex : gles2_tex->image_tex;
 
 	GLint tex_coord_loc = glGetAttribLocation(gl->texture_program, "tex_coord");
 	GLint mvp_loc = glGetUniformLocation(gl->texture_program, "mvp");
@@ -235,7 +232,7 @@ static void render_surface(struct wxrc_gl *gl, mat4 vp_matrix,
 	glUseProgram(gl->texture_program);
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, tex_id);
+	glBindTexture(gles2_tex->target, gles2_tex->tex);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glUniform1i(tex_loc, 0);

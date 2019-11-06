@@ -14,33 +14,26 @@ struct wxrc_gl {
 	GLuint texture_program;
 };
 
-/* TODO: remove these private wlroots definitions */
-
-enum wlr_gles2_texture_type {
-	WLR_GLES2_TEXTURE_GLTEX,
-	WLR_GLES2_TEXTURE_WL_DRM_GL,
-	WLR_GLES2_TEXTURE_WL_DRM_EXT,
-	WLR_GLES2_TEXTURE_DMABUF,
-};
+/* TODO: remove this private wlroots definition */
 
 struct wlr_gles2_texture {
 	struct wlr_texture wlr_texture;
-
 	struct wlr_egl *egl;
-	enum wlr_gles2_texture_type type;
-	int width, height;
-	bool has_alpha;
-	enum wl_shm_format wl_format; // used to interpret upload data
-	bool inverted_y;
 
-	// Not set if WLR_GLES2_TEXTURE_GLTEX
+	// Basically:
+	//   GL_TEXTURE_2D == mutable
+	//   GL_TEXTURE_EXTERNAL_OES == immutable
+	GLenum target;
+	GLuint tex;
+
 	EGLImageKHR image;
-	GLuint image_tex;
 
-	union {
-		GLuint gl_tex;
-		struct wl_resource *wl_drm;
-	};
+	int width, height;
+	bool inverted_y;
+	bool has_alpha;
+
+	// Only affects target == GL_TEXTURE_2D
+	enum wl_shm_format wl_format; // used to interpret upload data
 };
 
 bool wxrc_gl_init(struct wxrc_gl *gl);
