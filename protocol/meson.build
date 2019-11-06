@@ -32,7 +32,7 @@ endforeach
 lib_wl_protocols = static_library(
 	'wl_protocols',
 	wl_protocols_src + wl_protocols_headers,
-	dependencies: wayland_server.partial_dependency(compile_args: true),
+	dependencies: wayland_client.partial_dependency(compile_args: true),
 )
 
 wxrc_protocols = declare_dependency(

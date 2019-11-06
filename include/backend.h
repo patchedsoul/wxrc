@@ -21,6 +21,7 @@ struct wxrc_xr_backend {
 
 	bool started;
 
+	struct wl_display *remote_display;
 	struct wlr_egl egl;
 	struct wlr_renderer *renderer;
 
@@ -33,7 +34,7 @@ struct wxrc_xr_backend {
 	uint32_t nviews;
 	struct wxrc_xr_view *views;
 
-	struct wl_listener display_destroy;
+	struct wl_listener local_display_destroy;
 };
 
 bool wxrc_backend_is_xr(struct wlr_backend *wlr_backend);
