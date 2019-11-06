@@ -58,12 +58,15 @@ static const GLchar texture_fragment_shader_src[] =
 	"precision mediump float;\n"
 	"\n"
 	"uniform sampler2D tex;\n"
+	"uniform bool has_alpha;\n"
 	"\n"
 	"varying vec2 vertex_tex_coord;\n"
 	"\n"
 	"void main() {\n"
 	"	gl_FragColor = texture2D(tex, vertex_tex_coord);\n"
-	"	gl_FragColor.a = 1.0;\n"
+	"	if (!has_alpha) {\n"
+	"		gl_FragColor.a = 1.0;\n"
+	"	}\n"
 	"}\n";
 
 static GLuint wxrc_gl_compile_shader(GLuint type, const GLchar *src) {
@@ -226,7 +229,7 @@ static void render_surface(struct wxrc_gl *gl, mat4 vp_matrix,
 
 	struct wlr_gles2_texture_attribs attribs = {0};
 	wlr_gles2_texture_get_attribs(tex, &attribs);
-	/* TODO: add support for external textures, alpha channel, inverted_y */
+	/* TODO: add support for external textures, inverted_y */
 	if (attribs.target != GL_TEXTURE_2D || attribs.inverted_y) {
 		return;
 	}
@@ -237,6 +240,7 @@ static void render_surface(struct wxrc_gl *gl, mat4 vp_matrix,
 	GLint tex_coord_loc = glGetAttribLocation(gl->texture_program, "tex_coord");
 	GLint mvp_loc = glGetUniformLocation(gl->texture_program, "mvp");
 	GLint tex_loc = glGetUniformLocation(gl->texture_program, "tex");
+	GLint has_alpha_loc = glGetUniformLocation(gl->texture_program, "has_alpha");
 
 	glUseProgram(gl->texture_program);
 
@@ -245,6 +249,8 @@ static void render_surface(struct wxrc_gl *gl, mat4 vp_matrix,
 	glTexParameteri(attribs.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(attribs.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glUniform1i(tex_loc, 0);
+
+	glUniform1i(has_alpha_loc, attribs.has_alpha);
 
 	float scale_x = -width / 300.0;
 	float scale_y = -height / 300.0;
@@ -287,6 +293,8 @@ void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 
 	glViewport(0, 0, width, height);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
 		image, 0);
