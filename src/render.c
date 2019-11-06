@@ -301,7 +301,7 @@ static void render_surface(struct wxrc_gl *gl, mat4 vp_matrix,
 	mat4 model_matrix;
 	glm_mat4_identity(model_matrix);
 	glm_scale(model_matrix, (vec3){ scale_x, scale_y, 1.0 });
-	glm_translate(model_matrix, (vec3){ 0.0, 0.0, 2.0 });
+	glm_translate(model_matrix, (vec3){ -0.5, -0.5, 2.0 });
 
 	mat4 mvp_matrix = GLM_MAT4_IDENTITY_INIT;
 	glm_mat4_mul(vp_matrix, model_matrix, mvp_matrix);
