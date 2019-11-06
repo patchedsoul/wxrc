@@ -273,6 +273,17 @@ static void render_surface(struct wxrc_gl *gl, mat4 vp_matrix,
 	glUseProgram(0);
 }
 
+struct wxrc_render_data {
+	struct wxrc_server *server;
+	mat4 *vp_matrix;
+};
+
+static void render_surface_iterator(struct wlr_surface *surface,
+		int sx, int sy, void *_data) {
+	struct wxrc_render_data *data = _data;
+	render_surface(&data->server->gl, *data->vp_matrix, surface);
+}
+
 void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 		XrView *xr_view, GLuint framebuffer, GLuint image) {
 	uint32_t width = view->config.recommendedImageRectWidth;
@@ -309,7 +320,12 @@ void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 
 	struct wxrc_toplevel *toplevel;
 	wl_list_for_each(toplevel, &server->toplevels, link) {
-		render_surface(&server->gl, vp_matrix, toplevel->xdg_surface->surface);
+		struct wxrc_render_data data = {
+			.server = server,
+			.vp_matrix = &vp_matrix,
+		};
+		wlr_xdg_surface_for_each_surface(toplevel->xdg_surface,
+			render_surface_iterator, &data);
 	};
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
