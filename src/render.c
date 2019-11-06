@@ -1,6 +1,7 @@
 #include <cglm/cglm.h>
 #include <stdlib.h>
 #include <wlr/util/log.h>
+#include <wlr/render/gles2.h>
 #include "render.h"
 #include "server.h"
 #include "backend.h"
@@ -216,9 +217,14 @@ static void render_surface(struct wxrc_gl *gl, mat4 vp_matrix,
 	if (tex == NULL) {
 		return;
 	}
-	/* TODO: this is a hack */
-	struct wlr_gles2_texture *gles2_tex = (struct wlr_gles2_texture *)tex;
-	if (gles2_tex->target != GL_TEXTURE_2D) {
+	if (!wlr_texture_is_gles2(tex)) {
+		return;
+	}
+
+	struct wlr_gles2_texture_attribs attribs = {0};
+	wlr_gles2_texture_get_attribs(tex, &attribs);
+	/* TODO: add support for external textures, alpha channel, inverted_y */
+	if (attribs.target != GL_TEXTURE_2D || attribs.inverted_y) {
 		return;
 	}
 
@@ -232,9 +238,9 @@ static void render_surface(struct wxrc_gl *gl, mat4 vp_matrix,
 	glUseProgram(gl->texture_program);
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(gles2_tex->target, gles2_tex->tex);
-	glTexParameteri(gles2_tex->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(gles2_tex->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glBindTexture(attribs.target, attribs.tex);
+	glTexParameteri(attribs.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(attribs.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glUniform1i(tex_loc, 0);
 
 	float scale_x = -width / 300.0;
