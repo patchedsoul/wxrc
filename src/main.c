@@ -19,13 +19,8 @@
 static XrResult wxrc_xr_view_push_frame(struct wxrc_xr_view *view,
 		struct wxrc_server *server, XrView *xr_view,
 		XrCompositionLayerProjectionView *projection_view) {
-	XrSwapchainImageAcquireInfo swapchain_image_acquire_info = {
-		.type = XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO,
-		.next = NULL,
-	};
 	uint32_t buffer_index;
-	XrResult r = xrAcquireSwapchainImage(view->swapchain,
-		&swapchain_image_acquire_info, &buffer_index);
+	XrResult r = xrAcquireSwapchainImage(view->swapchain, NULL, &buffer_index);
 	if (XR_FAILED(r)) {
 		wxrc_log_xr_result("xrAcquireSwapchainImage", r);
 		return r;
@@ -59,11 +54,7 @@ static XrResult wxrc_xr_view_push_frame(struct wxrc_xr_view *view,
 		view->images[buffer_index].image);
 	glFinish();
 
-	XrSwapchainImageReleaseInfo swapchain_release_info = {
-		.type = XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO,
-		.next = NULL,
-	};
-	r = xrReleaseSwapchainImage(view->swapchain, &swapchain_release_info);
+	r = xrReleaseSwapchainImage(view->swapchain, NULL);
 	if (XR_FAILED(r)) {
 		wxrc_log_xr_result("xrReleaseSwapchainImage", r);
 		return r;
@@ -98,11 +89,7 @@ static bool wxrc_xr_push_frame(struct wxrc_server *server,
 		return false;
 	}
 
-	XrFrameBeginInfo frame_begin_info = {
-		.type = XR_TYPE_FRAME_BEGIN_INFO,
-		.next = NULL,
-	};
-	r = xrBeginFrame(backend->session, &frame_begin_info);
+	r = xrBeginFrame(backend->session, NULL);
 	if (XR_FAILED(r)) {
 		wxrc_log_xr_result("xrBeginFrame", r);
 		return false;
@@ -264,15 +251,11 @@ int main(int argc, char *argv[]) {
 	XrCompositionLayerProjectionView *projection_views =
 		calloc(backend->nviews, sizeof(XrCompositionLayerProjectionView));
 	while (running) {
-		XrFrameWaitInfo frame_wait_info = {
-			.type = XR_TYPE_FRAME_WAIT_INFO,
-			.next = NULL,
-		};
 		XrFrameState frame_state = {
 			.type = XR_TYPE_FRAME_STATE,
 			.next = NULL,
 		};
-		XrResult r = xrWaitFrame(backend->session, &frame_wait_info, &frame_state);
+		XrResult r = xrWaitFrame(backend->session, NULL, &frame_state);
 		if (XR_FAILED(r)) {
 			wxrc_log_xr_result("xrWaitFrame", r);
 			return 1;
