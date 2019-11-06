@@ -12,7 +12,7 @@ struct wxrc_server;
 
 struct wxrc_gl {
 	GLuint grid_program;
-	GLuint texture_program;
+	GLuint texture_rgb_program;
 };
 
 bool wxrc_gl_init(struct wxrc_gl *gl);
