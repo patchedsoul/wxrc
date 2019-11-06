@@ -1,4 +1,8 @@
 #include <cglm/cglm.h>
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+#include <GLES2/gl2.h>
+#include <GLES2/gl2ext.h>
 #include <stdlib.h>
 #include <wlr/util/log.h>
 #include <wlr/render/gles2.h>
@@ -69,6 +73,19 @@ static const GLchar texture_rgb_fragment_shader_src[] =
 	"	}\n"
 	"}\n";
 
+static const GLchar texture_external_fragment_shader_src[] =
+	"#version 100\n"
+	"#extension GL_OES_EGL_image_external : require\n"
+	"precision mediump float;\n"
+	"\n"
+	"uniform samplerExternalOES tex;\n"
+	"\n"
+	"varying vec2 vertex_tex_coord;\n"
+	"\n"
+	"void main() {\n"
+	"	gl_FragColor = texture2D(tex, vertex_tex_coord);\n"
+	"}\n";
+
 static GLuint wxrc_gl_compile_shader(GLuint type, const GLchar *src) {
 	GLuint shader = glCreateShader(type);
 	glShaderSource(shader, 1, &src, NULL);
@@ -106,6 +123,12 @@ bool wxrc_gl_init(struct wxrc_gl *gl) {
 			.vertex_src = texture_vertex_shader_src,
 			.fragment_src = texture_rgb_fragment_shader_src,
 			.program_ptr = &gl->texture_rgb_program,
+		},
+		{
+			.name = "texture_external",
+			.vertex_src = texture_vertex_shader_src,
+			.fragment_src = texture_external_fragment_shader_src,
+			.program_ptr = &gl->texture_external_program,
 		},
 	};
 
@@ -153,6 +176,7 @@ bool wxrc_gl_init(struct wxrc_gl *gl) {
 void wxrc_gl_finish(struct wxrc_gl *gl) {
 	glDeleteProgram(gl->grid_program);
 	glDeleteProgram(gl->texture_rgb_program);
+	glDeleteProgram(gl->texture_external_program);
 }
 
 static void wxrc_xr_vector3f_to_cglm(const XrVector3f *in, vec3 out) {
@@ -226,20 +250,33 @@ static void render_surface(struct wxrc_gl *gl, mat4 vp_matrix,
 		return;
 	}
 	if (!wlr_texture_is_gles2(tex)) {
+		wlr_log(WLR_ERROR, "unsupported texture type");
 		return;
 	}
 
 	struct wlr_gles2_texture_attribs attribs = {0};
 	wlr_gles2_texture_get_attribs(tex, &attribs);
-	/* TODO: add support for external textures, inverted_y */
-	if (attribs.target != GL_TEXTURE_2D || attribs.inverted_y) {
+	/* TODO: add support for inverted_y */
+	if (attribs.inverted_y) {
+		wlr_log(WLR_DEBUG, "inverted-Y textures aren't yet implemented");
 		return;
 	}
 
 	int width, height;
 	wlr_texture_get_size(tex, &width, &height);
 
-	GLuint prog = gl->texture_rgb_program;
+	GLuint prog;
+	switch (attribs.target) {
+	case GL_TEXTURE_2D:
+		prog = gl->texture_rgb_program;
+		break;
+	case GL_TEXTURE_EXTERNAL_OES:
+		prog = gl->texture_external_program;
+		break;
+	default:
+		wlr_log(WLR_ERROR, "unsupported texture target %d", attribs.target);
+		return;
+	}
 
 	GLint tex_coord_loc = glGetAttribLocation(prog, "tex_coord");
 	GLint mvp_loc = glGetUniformLocation(prog, "mvp");
@@ -254,7 +291,9 @@ static void render_surface(struct wxrc_gl *gl, mat4 vp_matrix,
 	glTexParameteri(attribs.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glUniform1i(tex_loc, 0);
 
-	glUniform1i(has_alpha_loc, attribs.has_alpha);
+	if (has_alpha_loc >= 0) {
+		glUniform1i(has_alpha_loc, attribs.has_alpha);
+	}
 
 	float scale_x = -width / 300.0;
 	float scale_y = -height / 300.0;

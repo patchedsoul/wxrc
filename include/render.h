@@ -2,8 +2,6 @@
 #define _WXRC_RENDER_H
 
 #include <stdbool.h>
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
 #include <GLES2/gl2.h>
 #include <openxr/openxr.h>
 
@@ -13,6 +11,7 @@ struct wxrc_server;
 struct wxrc_gl {
 	GLuint grid_program;
 	GLuint texture_rgb_program;
+	GLuint texture_external_program;
 };
 
 bool wxrc_gl_init(struct wxrc_gl *gl);
