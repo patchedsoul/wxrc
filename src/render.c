@@ -292,6 +292,8 @@ void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 
 	glViewport(0, 0, width, height);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
 		image, 0);
