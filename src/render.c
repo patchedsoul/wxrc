@@ -9,6 +9,7 @@
 #include "render.h"
 #include "server.h"
 #include "backend.h"
+#include "view.h"
 #include "xrutil.h"
 
 static const GLchar grid_vertex_shader_src[] =
@@ -179,19 +180,6 @@ void wxrc_gl_finish(struct wxrc_gl *gl) {
 	glDeleteProgram(gl->texture_external_program);
 }
 
-static void wxrc_xr_vector3f_to_cglm(const XrVector3f *in, vec3 out) {
-	out[0] = in->x;
-	out[1] = in->y;
-	out[2] = in->z;
-}
-
-static void wxrc_xr_quaternion_to_cglm(const XrQuaternionf *in, versor out) {
-	out[0] = in->x;
-	out[1] = in->y;
-	out[2] = in->z;
-	out[3] = in->w;
-}
-
 static const float fg_color[] = { 1.0, 1.0, 1.0, 1.0 };
 static const float bg_color[] = { 0.08, 0.07, 0.16, 1.0 };
 
@@ -239,8 +227,11 @@ static void render_grid(struct wxrc_gl *gl, mat4 vp_matrix) {
 	glUseProgram(0);
 }
 
-static void render_surface(struct wxrc_gl *gl, mat4 vp_matrix,
-		struct wlr_surface *surface) {
+static void render_view(struct wxrc_gl *gl,
+		mat4 vp_matrix, struct wxrc_view *view) {
+	/* TODO: Iterate over surface tree */
+	struct wlr_surface *surface = view->surface;
+
 	struct wlr_buffer *buffer = surface->buffer;
 	if (buffer == NULL) {
 		return;
@@ -297,10 +288,10 @@ static void render_surface(struct wxrc_gl *gl, mat4 vp_matrix,
 	glm_mat4_identity(model_matrix);
 	glm_scale(model_matrix, (vec3){ scale_x, scale_y, 1.0 });
 
-	glm_translate(model_matrix, (vec3){ 0, 0, -2.0 });
-	glm_rotate(model_matrix, 0, (vec3){ 1, 0, 0 }); /* x */
-	glm_rotate(model_matrix, 0, (vec3){ 0, 1, 0 }); /* y */
-	glm_rotate(model_matrix, 0, (vec3){ 0, 0, 1 }); /* z */
+	glm_translate(model_matrix, view->position);
+	glm_rotate(model_matrix, view->rotation[0], (vec3){ 1, 0, 0 });
+	glm_rotate(model_matrix, view->rotation[1], (vec3){ 0, 1, 0 });
+	glm_rotate(model_matrix, view->rotation[2], (vec3){ 0, 0, 1 });
 
 	/* Re-origin the view to the center */
 	glm_translate(model_matrix, (vec3){ -0.5, -0.5, 0.0 });
@@ -366,8 +357,12 @@ void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 
 	render_grid(&server->gl, vp_matrix);
 
-	if (server->current_surface != NULL) {
-		render_surface(&server->gl, vp_matrix, server->current_surface);
+	struct wxrc_view *wxrc_view;
+	wl_list_for_each(wxrc_view, &server->views, link) {
+		if (!wxrc_view->mapped) {
+			continue;
+		}
+		render_view(&server->gl, vp_matrix, wxrc_view);
 	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);

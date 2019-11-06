@@ -14,6 +14,7 @@
 #include "backend.h"
 #include "render.h"
 #include "server.h"
+#include "view.h"
 #include "xrutil.h"
 
 static XrResult wxrc_xr_view_push_frame(struct wxrc_xr_view *view,
@@ -157,15 +158,6 @@ static int handle_signal(int sig, void *data) {
 	return 0;
 }
 
-static void handle_new_surface(struct wl_listener *listener, void *data) {
-	struct wxrc_server *server = wl_container_of(listener, server, new_surface);
-	struct wlr_surface *surface = data;
-	if (server->current_surface == NULL) {
-		server->current_surface = surface;
-		/* TODO: add destroy handler */
-	}
-}
-
 static void send_geometry(struct wl_resource *resource) {
 	wl_output_send_geometry(resource, 0, 0,
 		1200, 1200, WL_OUTPUT_SUBPIXEL_UNKNOWN,
@@ -273,11 +265,10 @@ int main(int argc, char *argv[]) {
 	struct wlr_renderer *renderer = wlr_backend_get_renderer(&backend->base);
 	wlr_renderer_init_wl_display(renderer, server.wl_display);
 
-	server.compositor = wlr_compositor_create(server.wl_display, renderer);
-	server.new_surface.notify = handle_new_surface;
-	wl_signal_add(&server.compositor->events.new_surface, &server.new_surface);
+	wlr_compositor_create(server.wl_display, renderer);
 
-	server.xdg_shell = wlr_xdg_shell_create(server.wl_display);
+	wl_list_init(&server.views);
+	wxrc_xdg_shell_init(&server);
 
 	const char *wl_socket = wl_display_add_socket_auto(server.wl_display);
 	if (wl_socket == NULL) {
@@ -309,7 +300,7 @@ int main(int argc, char *argv[]) {
 			3, NULL, output_bind);
 
 	wlr_log(WLR_DEBUG, "Starting XR main loop");
-	XrView *xr_views = calloc(backend->nviews, sizeof(XrView));
+	server.xr_views = calloc(backend->nviews, sizeof(XrView));
 	XrCompositionLayerProjectionView *projection_views =
 		calloc(backend->nviews, sizeof(XrCompositionLayerProjectionView));
 	while (running) {
@@ -348,20 +339,23 @@ int main(int argc, char *argv[]) {
 		}
 
 		if (!wxrc_xr_push_frame(&server, frame_state.predictedDisplayTime,
-				xr_views, projection_views)) {
+				server.xr_views, projection_views)) {
 			return 1;
 		}
 
-		if (server.current_surface != NULL) {
-			struct timespec now;
-			clock_gettime(CLOCK_MONOTONIC, &now);
-			wlr_surface_send_frame_done(server.current_surface, &now);
+		struct timespec now;
+		/* TODO: Derive this from predictedDisplayTime */
+		clock_gettime(CLOCK_MONOTONIC, &now);
+
+		struct wxrc_view *view;
+		wl_list_for_each(view, &server.views, link) {
+			wlr_surface_send_frame_done(view->surface, &now);
 		}
 	}
 
 	wlr_log(WLR_DEBUG, "Tearing down XR instance");
 	free(projection_views);
-	free(xr_views);
+	free(server.xr_views);
 	wl_event_source_remove(signals[0]);
 	wl_event_source_remove(signals[1]);
 	wxrc_gl_finish(&server.gl);

@@ -65,6 +65,7 @@ executable('wxrc',
 		'src/backend.c',
 		'src/main.c',
 		'src/render.c',
+		'src/xdg-shell.c',
 		'src/xrutil.c',
 	),
 	dependencies: [

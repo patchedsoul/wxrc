@@ -16,4 +16,7 @@ void wxrc_log_xr_result(const char *entrypoint, XrResult r);
 void wxrc_xr_projection_from_fov(const XrFovf *fov, float near_z, float far_z,
 	mat4 dest);
 
+void wxrc_xr_vector3f_to_cglm(const XrVector3f *in, vec3 out);
+void wxrc_xr_quaternion_to_cglm(const XrQuaternionf *in, versor out);
+
 #endif

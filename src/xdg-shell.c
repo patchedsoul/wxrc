@@ -1,0 +1,81 @@
+#include <stdlib.h>
+#include <string.h>
+#include <wlr/types/wlr_xdg_shell.h>
+#include <wlr/util/log.h>
+#include "server.h"
+#include "view.h"
+#include "xrutil.h"
+
+static void handle_xdg_surface_map(struct wl_listener *listener, void *data) {
+	struct wxrc_xdg_shell_view *view = wl_container_of(listener, view, map);
+	vec3 pos = { 0.0, 0.0, -2.0 };
+	vec3 rot = { 0.0, 0.0, 0.0 };
+
+	/* TODO: Move this into shared code */
+	/* TODO: Computer rotation vector as well */
+	mat4 view_matrix;
+	versor orientation;
+	vec3 position;
+	XrView *xr_view = &view->base.server->xr_views[0];
+	wxrc_xr_quaternion_to_cglm(&xr_view->pose.orientation, orientation);
+	glm_quat_mat4(orientation, view_matrix);
+	wxrc_xr_vector3f_to_cglm(&xr_view->pose.position, position);
+	position[1] = 0; /* TODO: don't zero out Y-axis */
+	glm_translate(view_matrix, position);
+	glm_mat4_inv(view_matrix, view_matrix);
+	glm_vec3_rotate_m4(view_matrix, pos, pos);
+	glm_euler_angles(view_matrix, rot);
+	rot[2] = 0; // Keep views perpendicular to grid
+
+	glm_vec3_copy(pos, view->base.position);
+	glm_vec3_copy(rot, view->base.rotation);
+
+	wlr_log(WLR_DEBUG, "Spawning view at <%f,%f,%f>",
+			pos[0], pos[1], pos[2]);
+
+	view->base.mapped = true;
+}
+
+static void handle_xdg_surface_unmap(struct wl_listener *listener, void *data) {
+	struct wxrc_xdg_shell_view *view = wl_container_of(listener, view, unmap);
+	view->base.mapped = false;
+}
+
+static void handle_xdg_surface_destroy(
+		struct wl_listener *listener, void *data) {
+	struct wxrc_xdg_shell_view *view = wl_container_of(listener, view, destroy);
+	wl_list_remove(&view->base.link);
+	free(view);
+}
+
+static void handle_new_xdg_surface(struct wl_listener *listener, void *data) {
+	struct wxrc_server *server =
+		wl_container_of(listener, server, new_xdg_surface);
+	struct wlr_xdg_surface *xdg_surface = data;
+	if (xdg_surface->role != WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
+		return;
+	}
+
+	struct wxrc_xdg_shell_view *view =
+		calloc(1, sizeof(struct wxrc_xdg_shell_view));
+	view->base.server = server;
+	view->base.view_type = WXRC_VIEW_XDG_SHELL;
+	view->base.surface = xdg_surface->surface;
+	view->xdg_surface = xdg_surface;
+
+	view->map.notify = handle_xdg_surface_map;
+	wl_signal_add(&xdg_surface->events.map, &view->map);
+	view->unmap.notify = handle_xdg_surface_unmap;
+	wl_signal_add(&xdg_surface->events.unmap, &view->unmap);
+	view->destroy.notify = handle_xdg_surface_destroy;
+	wl_signal_add(&xdg_surface->events.destroy, &view->destroy);
+
+	wl_list_insert(&server->views, &view->base.link);
+}
+
+void wxrc_xdg_shell_init(struct wxrc_server *server) {
+	server->xdg_shell = wlr_xdg_shell_create(server->wl_display);
+	server->new_xdg_surface.notify = handle_new_xdg_surface;
+	wl_signal_add(&server->xdg_shell->events.new_surface,
+			&server->new_xdg_surface);
+}

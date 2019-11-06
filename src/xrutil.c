@@ -1,3 +1,4 @@
+#include <cglm/cglm.h>
 #include <math.h>
 #include <openxr/openxr.h>
 #include <stdio.h>
@@ -330,4 +331,17 @@ void wxrc_xr_projection_from_fov(const XrFovf *fov, float near_z, float far_z,
 	};
 
 	memcpy(dest, mat, sizeof(mat));
+}
+
+void wxrc_xr_vector3f_to_cglm(const XrVector3f *in, vec3 out) {
+	out[0] = in->x;
+	out[1] = in->y;
+	out[2] = in->z;
+}
+
+void wxrc_xr_quaternion_to_cglm(const XrQuaternionf *in, versor out) {
+	out[0] = in->x;
+	out[1] = in->y;
+	out[2] = in->z;
+	out[3] = in->w;
 }
