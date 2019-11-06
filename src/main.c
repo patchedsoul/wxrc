@@ -186,6 +186,12 @@ static void handle_new_xdg_surface(struct wl_listener *listener, void *data) {
 	wl_signal_add(&xdg_surface->events.destroy, &toplevel->xdg_surface_destroy);
 }
 
+static void send_frame_done_iterator(struct wlr_surface *surface,
+		int sx, int sy, void *data) {
+	struct timespec *t = data;
+	wlr_surface_send_frame_done(surface, t);
+}
+
 int main(int argc, char *argv[]) {
 	struct wxrc_server server = {0};
 	wl_list_init(&server.toplevels);
@@ -318,7 +324,8 @@ int main(int argc, char *argv[]) {
 		clock_gettime(CLOCK_MONOTONIC, &now);
 		struct wxrc_toplevel *toplevel;
 		wl_list_for_each(toplevel, &server.toplevels, link) {
-			wlr_surface_send_frame_done(toplevel->xdg_surface->surface, &now);
+			wlr_xdg_surface_for_each_surface(toplevel->xdg_surface,
+				send_frame_done_iterator, &now);
 		}
 	}
 
