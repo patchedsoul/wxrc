@@ -6,6 +6,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <wayland-server.h>
 #include <wlr/render/egl.h>
 #include <wlr/util/log.h>
@@ -280,7 +281,8 @@ int main(int argc, char *argv[]) {
 		}
 
 		if (server.current_surface != NULL) {
-			struct timespec now = {0};
+			struct timespec now;
+			clock_gettime(CLOCK_MONOTONIC, &now);
 			wlr_surface_send_frame_done(server.current_surface, &now);
 		}
 	}
