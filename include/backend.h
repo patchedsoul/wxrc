@@ -6,6 +6,7 @@
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
 #include <wlr/backend/interface.h>
+#include <wlr/render/wlr_renderer.h>
 
 struct wxrc_xr_view {
 	XrViewConfigurationView config;
@@ -21,8 +22,7 @@ struct wxrc_xr_backend {
 
 	bool started;
 
-	struct wl_display *remote_display;
-	struct wlr_egl egl;
+	struct wlr_egl *egl;
 	struct wlr_renderer *renderer;
 
 	XrInstance instance;
@@ -38,6 +38,7 @@ struct wxrc_xr_backend {
 };
 
 bool wxrc_backend_is_xr(struct wlr_backend *wlr_backend);
-struct wxrc_xr_backend *wxrc_xr_backend_create(struct wl_display *display);
+struct wxrc_xr_backend *wxrc_xr_backend_create(struct wl_display *display,
+		struct wlr_renderer *renderer, struct wlr_egl *egl);
 
 #endif

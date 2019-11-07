@@ -519,7 +519,7 @@ static bool backend_start(struct wlr_backend *wlr_backend) {
 	}
 
 	XrResult r = wxrc_create_xr_session(backend->instance, backend->sysid,
-		&backend->session, &backend->egl);
+		&backend->session, backend->egl);
 	if (XR_FAILED(r)) {
 		return false;
 	}
@@ -578,11 +578,6 @@ static void backend_destroy(struct wlr_backend *wlr_backend) {
 	xrDestroySession(backend->session);
 	xrDestroyInstance(backend->instance);
 
-	wlr_renderer_destroy(backend->renderer);
-	wlr_egl_finish(&backend->egl);
-
-	wl_display_disconnect(backend->remote_display);
-
 	free(backend);
 }
 
@@ -608,7 +603,8 @@ static void handle_display_destroy(struct wl_listener *listener, void *data) {
 	backend_destroy(&backend->base);
 }
 
-struct wxrc_xr_backend *wxrc_xr_backend_create(struct wl_display *display) {
+struct wxrc_xr_backend *wxrc_xr_backend_create(struct wl_display *display,
+		struct wlr_renderer *renderer, struct wlr_egl *egl) {
 	struct wxrc_xr_backend *backend = calloc(1, sizeof(*backend));
 	if (backend == NULL) {
 		wlr_log_errno(WLR_ERROR, "calloc failed");
@@ -616,29 +612,8 @@ struct wxrc_xr_backend *wxrc_xr_backend_create(struct wl_display *display) {
 	}
 	wlr_backend_init(&backend->base, &backend_impl);
 
-	/* TODO: support more platforms */
-	backend->remote_display = wl_display_connect(NULL);
-	if (backend->remote_display == NULL) {
-		wlr_log(WLR_ERROR, "wl_display_connect failed");
-		return NULL;
-	}
-
-	EGLint egl_config_attribs[] = {
-		EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
-		EGL_RED_SIZE, 1,
-		EGL_GREEN_SIZE, 1,
-		EGL_BLUE_SIZE, 1,
-		EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
-		EGL_NONE,
-	};
-	backend->renderer = wlr_renderer_autocreate(&backend->egl,
-		EGL_PLATFORM_WAYLAND_EXT, backend->remote_display, egl_config_attribs,
-		WL_SHM_FORMAT_ARGB8888);
-	if (backend->renderer == NULL) {
-		wlr_log(WLR_ERROR, "wlr_renderer_autocreate failed");
-		wl_display_disconnect(backend->remote_display);
-		return NULL;
-	}
+	backend->egl = egl;
+	backend->renderer = renderer;
 
 	if (!wxrc_xr_init(backend)) {
 		return NULL;

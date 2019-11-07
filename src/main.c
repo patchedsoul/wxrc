@@ -9,6 +9,8 @@
 #include <time.h>
 #include <unistd.h>
 #include <wayland-server.h>
+#include <wlr/backend.h>
+#include <wlr/backend/multi.h>
 #include <wlr/types/wlr_data_device.h>
 #include <wlr/types/wlr_seat.h>
 #include <wlr/render/egl.h>
@@ -69,7 +71,7 @@ static XrResult wxrc_xr_view_push_frame(struct wxrc_xr_view *view,
 static bool wxrc_xr_push_frame(struct wxrc_server *server,
 		XrTime predicted_display_time, XrView *xr_views,
 		XrCompositionLayerProjectionView *projection_views) {
-	struct wxrc_xr_backend *backend = server->backend;
+	struct wxrc_xr_backend *backend = server->xr_backend;
 
 	for (uint32_t i = 0; i < backend->nviews; i++) {
 		xr_views[i].type = XR_TYPE_VIEW;
@@ -217,6 +219,16 @@ static void output_bind(struct wl_client *wl_client, void *data,
 	send_done(resource);
 }
 
+static struct wlr_egl *native_egl;
+
+struct wlr_renderer *create_renderer(struct wlr_egl *egl, EGLenum platform,
+		void *remote_display, EGLint *config_attribs, EGLint visual_id) {
+	/* HACK HACK HACK */
+	native_egl = egl;
+	return wlr_renderer_autocreate(egl, platform,
+			remote_display, config_attribs, visual_id);
+}
+
 int main(int argc, char *argv[]) {
 	struct wxrc_server server = {0};
 
@@ -253,18 +265,26 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	server.backend = wxrc_xr_backend_create(server.wl_display);
+	server.backend = wlr_backend_autocreate(server.wl_display, create_renderer);
 	if (server.backend == NULL) {
-		wlr_log(WLR_ERROR, "wxrc_xr_backend_create failed");
+		wlr_log(WLR_ERROR, "Failed to create native backend");
 		return 1;
 	}
-	struct wxrc_xr_backend *backend = server.backend;
+
+	struct wlr_renderer *renderer = wlr_backend_get_renderer(server.backend);
+	server.xr_backend = wxrc_xr_backend_create(
+			server.wl_display, renderer, native_egl);
+	if (server.xr_backend == NULL || server.backend == NULL) {
+		wlr_log(WLR_ERROR, "backend creation failed");
+		return 1;
+	}
+	struct wxrc_xr_backend *xr_backend = server.xr_backend;
+	wlr_multi_backend_add(server.backend, &xr_backend->base);
 
 	if (!wxrc_gl_init(&server.gl)) {
 		return 1;
 	}
 
-	struct wlr_renderer *renderer = wlr_backend_get_renderer(&backend->base);
 	wlr_renderer_init_wl_display(renderer, server.wl_display);
 
 	wlr_compositor_create(server.wl_display, renderer);
@@ -283,7 +303,7 @@ int main(int argc, char *argv[]) {
 	wlr_log(WLR_INFO, "Wayland compositor listening on WAYLAND_DISPLAY=%s",
 		wl_socket);
 
-	if (!wlr_backend_start(&backend->base)) {
+	if (!wlr_backend_start(server.backend)) {
 		wlr_log(WLR_ERROR, "wlr_backend_start failed");
 		return 1;
 	}
@@ -305,15 +325,15 @@ int main(int argc, char *argv[]) {
 			3, NULL, output_bind);
 
 	wlr_log(WLR_DEBUG, "Starting XR main loop");
-	server.xr_views = calloc(backend->nviews, sizeof(XrView));
+	server.xr_views = calloc(xr_backend->nviews, sizeof(XrView));
 	XrCompositionLayerProjectionView *projection_views =
-		calloc(backend->nviews, sizeof(XrCompositionLayerProjectionView));
+		calloc(xr_backend->nviews, sizeof(XrCompositionLayerProjectionView));
 	while (running) {
 		XrFrameState frame_state = {
 			.type = XR_TYPE_FRAME_STATE,
 			.next = NULL,
 		};
-		XrResult r = xrWaitFrame(backend->session, NULL, &frame_state);
+		XrResult r = xrWaitFrame(xr_backend->session, NULL, &frame_state);
 		if (XR_FAILED(r)) {
 			wxrc_log_xr_result("xrWaitFrame", r);
 			return 1;
@@ -323,7 +343,7 @@ int main(int argc, char *argv[]) {
 			.type = XR_TYPE_EVENT_DATA_BUFFER,
 			.next = NULL,
 		};
-		r = xrPollEvent(backend->instance, &event);
+		r = xrPollEvent(xr_backend->instance, &event);
 		if (r != XR_EVENT_UNAVAILABLE) {
 			if (XR_FAILED(r)) {
 				wxrc_log_xr_result("xrPollEvent", r);
