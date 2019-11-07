@@ -219,16 +219,6 @@ static void output_bind(struct wl_client *wl_client, void *data,
 	send_done(resource);
 }
 
-static struct wlr_egl *native_egl;
-
-struct wlr_renderer *create_renderer(struct wlr_egl *egl, EGLenum platform,
-		void *remote_display, EGLint *config_attribs, EGLint visual_id) {
-	/* HACK HACK HACK */
-	native_egl = egl;
-	return wlr_renderer_autocreate(egl, platform,
-			remote_display, config_attribs, visual_id);
-}
-
 int main(int argc, char *argv[]) {
 	struct wxrc_server server = {0};
 
@@ -265,15 +255,14 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	server.backend = wlr_backend_autocreate(server.wl_display, create_renderer);
+	server.backend = wlr_backend_autocreate(server.wl_display, NULL);
 	if (server.backend == NULL) {
 		wlr_log(WLR_ERROR, "Failed to create native backend");
 		return 1;
 	}
 
 	struct wlr_renderer *renderer = wlr_backend_get_renderer(server.backend);
-	server.xr_backend = wxrc_xr_backend_create(
-			server.wl_display, renderer, native_egl);
+	server.xr_backend = wxrc_xr_backend_create(server.wl_display, renderer);
 	if (server.xr_backend == NULL || server.backend == NULL) {
 		wlr_log(WLR_ERROR, "backend creation failed");
 		return 1;

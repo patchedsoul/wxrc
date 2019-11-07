@@ -604,7 +604,7 @@ static void handle_display_destroy(struct wl_listener *listener, void *data) {
 }
 
 struct wxrc_xr_backend *wxrc_xr_backend_create(struct wl_display *display,
-		struct wlr_renderer *renderer, struct wlr_egl *egl) {
+		struct wlr_renderer *renderer) {
 	struct wxrc_xr_backend *backend = calloc(1, sizeof(*backend));
 	if (backend == NULL) {
 		wlr_log_errno(WLR_ERROR, "calloc failed");
@@ -612,7 +612,7 @@ struct wxrc_xr_backend *wxrc_xr_backend_create(struct wl_display *display,
 	}
 	wlr_backend_init(&backend->base, &backend_impl);
 
-	backend->egl = egl;
+	backend->egl = wlr_renderer_get_egl(renderer);
 	backend->renderer = renderer;
 
 	if (!wxrc_xr_init(backend)) {

@@ -38,7 +38,7 @@ struct wxrc_xr_backend {
 };
 
 bool wxrc_backend_is_xr(struct wlr_backend *wlr_backend);
-struct wxrc_xr_backend *wxrc_xr_backend_create(struct wl_display *display,
-		struct wlr_renderer *renderer, struct wlr_egl *egl);
+struct wxrc_xr_backend *wxrc_xr_backend_create(
+		struct wl_display *display, struct wlr_renderer *renderer);
 
 #endif
