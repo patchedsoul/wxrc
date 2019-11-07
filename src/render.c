@@ -286,12 +286,12 @@ static void render_view(struct wxrc_gl *gl,
 
 	mat4 model_matrix;
 	glm_mat4_identity(model_matrix);
-	glm_scale(model_matrix, (vec3){ scale_x, scale_y, 1.0 });
 
 	glm_translate(model_matrix, view->position);
 	glm_rotate(model_matrix, view->rotation[0], (vec3){ 1, 0, 0 });
 	glm_rotate(model_matrix, view->rotation[1], (vec3){ 0, 1, 0 });
 	glm_rotate(model_matrix, view->rotation[2], (vec3){ 0, 0, 1 });
+	glm_scale(model_matrix, (vec3){ scale_x, scale_y, 1.0 });
 
 	/* Re-origin the view to the center */
 	glm_translate(model_matrix, (vec3){ -0.5, -0.5, 0.0 });
