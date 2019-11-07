@@ -34,7 +34,7 @@ static void handle_xdg_surface_map(struct wl_listener *listener, void *data) {
 	wlr_log(WLR_DEBUG, "Spawning view at <%f,%f,%f>",
 			pos[0], pos[1], pos[2]);
 
-	focus_view(&view->base, view->xdg_surface->surface);
+	focus_view(&view->base, NULL);
 	view->base.mapped = true;
 }
 

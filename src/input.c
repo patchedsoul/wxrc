@@ -2,6 +2,7 @@
 #include <wlr/types/wlr_input_device.h>
 #include <wlr/util/log.h>
 #include <xkbcommon/xkbcommon.h>
+#include <unistd.h>
 #include "input.h"
 #include "server.h"
 #include "view.h"
@@ -10,6 +11,10 @@ void focus_view(struct wxrc_view *view, struct wlr_surface *surface) {
 	if (view == NULL) {
 		return;
 	}
+	if (surface == NULL) {
+		surface = view->surface;
+	}
+
 	struct wxrc_server *server = view->server;
 	struct wlr_seat *seat = server->seat;
 	struct wlr_surface *prev_surface = seat->keyboard_state.focused_surface;
@@ -31,7 +36,7 @@ void focus_view(struct wxrc_view *view, struct wlr_surface *surface) {
 		struct wxrc_xdg_shell_view *xdg_view =
 			(struct wxrc_xdg_shell_view *)view;
 		wlr_xdg_toplevel_set_activated(xdg_view->xdg_surface, true);
-		wlr_seat_keyboard_notify_enter(seat, xdg_view->xdg_surface->surface,
+		wlr_seat_keyboard_notify_enter(seat, surface,
 				keyboard->keycodes, keyboard->num_keycodes,
 				&keyboard->modifiers);
 		break;
@@ -49,6 +54,47 @@ static void keyboard_handle_modifiers(
 		&keyboard->device->keyboard->modifiers);
 }
 
+static void spawn_terminal(void) {
+	pid_t pid = fork();
+	if (pid < 0) {
+		wlr_log_errno(WLR_ERROR, "fork failed");
+	} else if (pid == 0) {
+		const char *term = getenv("TERMINAL");
+		if (!term) {
+			term = "alacritty";
+		}
+		execl("/bin/sh", "/bin/sh", "-c", term, (void *)NULL);
+		wlr_log_errno(WLR_ERROR, "execl failed");
+		exit(1);
+	}
+}
+
+static bool handle_keybinding(struct wxrc_server *server, xkb_keysym_t sym) {
+	switch (sym) {
+	case XKB_KEY_Escape:
+		wl_display_terminate(server->wl_display);
+		break;
+	case XKB_KEY_Tab:
+		if (wl_list_length(&server->views) < 2) {
+			break;
+		}
+		struct wxrc_view *current_view = wl_container_of(
+			server->views.next, current_view, link);
+		struct wxrc_view *next_view = wl_container_of(
+			current_view->link.next, next_view, link);
+		focus_view(next_view, NULL);
+		wl_list_remove(&current_view->link);
+		wl_list_insert(server->views.prev, &current_view->link);
+		break;
+	case XKB_KEY_Return:
+		spawn_terminal();
+		break;
+	default:
+		return false;
+	}
+	return true;
+}
+
 static void keyboard_handle_key(
 		struct wl_listener *listener, void *data) {
 	struct wxrc_keyboard *keyboard =
@@ -57,10 +103,25 @@ static void keyboard_handle_key(
 	struct wlr_event_keyboard_key *event = data;
 	struct wlr_seat *seat = server->seat;
 
-	/* TODO: keybindings */
-	wlr_seat_set_keyboard(seat, keyboard->device);
-	wlr_seat_keyboard_notify_key(seat, event->time_msec,
-		event->keycode, event->state);
+	uint32_t keycode = event->keycode + 8;
+	const xkb_keysym_t *syms;
+	int nsyms = xkb_state_key_get_syms(
+			keyboard->device->keyboard->xkb_state, keycode, &syms);
+
+	/* TODO: In the future we'll likely want a more sophisticated approach */
+	bool handled = false;
+	uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard->device->keyboard);
+	if ((modifiers & WLR_MODIFIER_ALT) && event->state == WLR_KEY_PRESSED) {
+		for (int i = 0; i < nsyms; i++) {
+			handled = handle_keybinding(server, syms[i]);
+		}
+	}
+
+	if (!handled) {
+		wlr_seat_set_keyboard(seat, keyboard->device);
+		wlr_seat_keyboard_notify_key(seat, event->time_msec,
+			event->keycode, event->state);
+	}
 }
 
 void handle_new_keyboard(struct wxrc_server *server,
