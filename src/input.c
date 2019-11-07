@@ -118,6 +118,20 @@ void wxrc_input_init(struct wxrc_server *server) {
 	wl_list_init(&server->pointers);
 
 	server->seat = wlr_seat_create(server->wl_display, "seat0");
+	server->cursor_mgr = wlr_xcursor_manager_create(NULL, 24);
+	wlr_xcursor_manager_load(server->cursor_mgr, 2);
+
+	struct wlr_renderer *renderer = wlr_backend_get_renderer(server->backend);
+	struct wlr_xcursor *xcursor =
+		wlr_xcursor_manager_get_xcursor(server->cursor_mgr, "left_ptr", 2);
+	server->xcursor_image = xcursor->images[0];
+	server->cursor = wlr_texture_from_pixels(renderer,
+			WL_SHM_FORMAT_ARGB8888, server->xcursor_image->width * 4,
+			server->xcursor_image->width, server->xcursor_image->height,
+			server->xcursor_image->buffer);
+	server->cursor_pos[0] = 0.0;
+	server->cursor_pos[1] = 0.0;
+	server->cursor_pos[2] = -2.0;
 
 	server->new_input.notify = handle_new_input;
 	wl_signal_add(&server->backend->events.new_input, &server->new_input);

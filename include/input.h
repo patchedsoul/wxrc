@@ -1,5 +1,7 @@
 #ifndef _WXRC_INPUT_H
 #define _WXRC_INPUT_H
+#include <wlr/types/wlr_input_device.h>
+#include <wayland-server.h>
 
 struct wxrc_server;
 

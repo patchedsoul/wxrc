@@ -1,9 +1,12 @@
 #ifndef WXRC_SERVER_H
 #define WXRC_SERVER_H
+#include <cglm/cglm.h>
 #include <openxr/openxr.h>
 #include <wayland-server.h>
 #include <wlr/backend.h>
 #include <wlr/types/wlr_compositor.h>
+#include <wlr/render/wlr_texture.h>
+#include <wlr/types/wlr_xcursor_manager.h>
 #include <wlr/types/wlr_xdg_shell.h>
 #include "render.h"
 
@@ -19,10 +22,15 @@ struct wxrc_server {
 	XrView *xr_views;
 
 	struct wlr_compositor *compositor;
-	struct wlr_seat *seat;
 	struct wlr_xdg_shell *xdg_shell;
 
 	struct wl_list views;
+
+	struct wlr_seat *seat;
+	struct wlr_xcursor_manager *cursor_mgr;
+	struct wlr_xcursor_image *xcursor_image;
+	struct wlr_texture *cursor;
+	vec3 cursor_pos; /* Relative to user's head */
 
 	struct wl_list keyboards;
 	struct wl_list pointers;

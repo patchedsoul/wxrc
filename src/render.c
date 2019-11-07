@@ -321,6 +321,84 @@ static void render_view(struct wxrc_gl *gl,
 	glUseProgram(0);
 }
 
+static void render_cursor(struct wxrc_server *server,
+		struct wxrc_gl *gl, mat4 view_matrix, mat4 vp_matrix) {
+	/* TODO: Could some of this be shared with render_view? */
+	struct wlr_texture *tex = server->cursor;
+
+	struct wlr_gles2_texture_attribs attribs = {0};
+	wlr_gles2_texture_get_attribs(tex, &attribs);
+
+	int width, height;
+	wlr_texture_get_size(tex, &width, &height);
+
+	GLuint prog = gl->texture_rgb_program;
+	GLint tex_coord_loc = glGetAttribLocation(prog, "tex_coord");
+	GLint mvp_loc = glGetUniformLocation(prog, "mvp");
+	GLint tex_loc = glGetUniformLocation(prog, "tex");
+	GLint has_alpha_loc = glGetUniformLocation(prog, "has_alpha");
+
+	glUseProgram(prog);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(attribs.target, attribs.tex);
+	glTexParameteri(attribs.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(attribs.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glUniform1i(tex_loc, 0);
+	if (has_alpha_loc >= 0) {
+		glUniform1i(has_alpha_loc, attribs.has_alpha);
+	}
+
+	mat4 model_matrix;
+	glm_mat4_identity(model_matrix);
+
+	/* The scale is different here because we use a 2x cursor image */
+	float scale_x = width / 600.0;
+	float scale_y = (height / 600.0) * (attribs.inverted_y ? 1 : -1);
+
+	/* TODO: Set Z location to the surface it's currently entered */
+	vec3 pos;
+	glm_vec3_copy(server->cursor_pos, pos);
+	vec3 rot = { 0.0, 0.0, 0.0 };
+
+	glm_mat4_inv(view_matrix, view_matrix);
+	glm_vec3_rotate_m4(view_matrix, pos, pos);
+	glm_euler_angles(view_matrix, rot);
+
+	glm_translate(model_matrix, pos);
+	glm_rotate(model_matrix, rot[0], (vec3){ 1, 0, 0 });
+	glm_rotate(model_matrix, rot[1], (vec3){ 0, 1, 0 });
+	glm_rotate(model_matrix, rot[2], (vec3){ 0, 0, 1 });
+	glm_scale(model_matrix, (vec3){ scale_x, scale_y, 1.0 });
+
+	/* Re-origin the cursor to the center (TODO: deal with hotspot here?) */
+	glm_translate(model_matrix, (vec3){ -0.5, -0.5, 0.0 });
+
+	mat4 mvp_matrix = GLM_MAT4_IDENTITY_INIT;
+	glm_mat4_mul(vp_matrix, model_matrix, mvp_matrix);
+
+	glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, (GLfloat *)mvp_matrix);
+
+	size_t npoints = 4;
+	const float points[] = {
+		0.0, 0.0,
+		0.0, 1.0,
+		1.0, 0.0,
+		1.0, 1.0,
+	};
+
+	GLint coords_per_point = sizeof(points) / sizeof(points[0]) / npoints;
+	glVertexAttribPointer(tex_coord_loc, coords_per_point,
+		GL_FLOAT, GL_FALSE, 0, points);
+	glEnableVertexAttribArray(tex_coord_loc);
+
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, npoints);
+
+	glDisableVertexAttribArray(tex_coord_loc);
+
+	glUseProgram(0);
+}
+
 void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 		XrView *xr_view, GLuint framebuffer, GLuint image) {
 	uint32_t width = view->config.recommendedImageRectWidth;
@@ -364,6 +442,8 @@ void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 		}
 		render_view(&server->gl, vp_matrix, wxrc_view);
 	}
+
+	render_cursor(server, &server->gl, view_matrix, vp_matrix);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
