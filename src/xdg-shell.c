@@ -2,6 +2,7 @@
 #include <string.h>
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/log.h>
+#include "input.h"
 #include "server.h"
 #include "view.h"
 #include "xrutil.h"
@@ -33,13 +34,21 @@ static void handle_xdg_surface_map(struct wl_listener *listener, void *data) {
 	wlr_log(WLR_DEBUG, "Spawning view at <%f,%f,%f>",
 			pos[0], pos[1], pos[2]);
 
-	wlr_xdg_toplevel_set_activated(view->xdg_surface, true);
+	focus_view(&view->base, view->xdg_surface->surface);
 	view->base.mapped = true;
 }
 
 static void handle_xdg_surface_unmap(struct wl_listener *listener, void *data) {
 	struct wxrc_xdg_shell_view *view = wl_container_of(listener, view, unmap);
 	view->base.mapped = false;
+
+	struct wxrc_view *wview;
+	wl_list_for_each(wview, &view->base.server->views, link) {
+		if (wview->mapped) {
+			focus_view(wview, wview->surface);
+			break;
+		}
+	}
 }
 
 static void handle_xdg_surface_destroy(

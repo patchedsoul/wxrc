@@ -16,6 +16,7 @@
 #include <wlr/render/egl.h>
 #include <wlr/util/log.h>
 #include "backend.h"
+#include "input.h"
 #include "render.h"
 #include "server.h"
 #include "view.h"
@@ -279,7 +280,7 @@ int main(int argc, char *argv[]) {
 	wlr_compositor_create(server.wl_display, renderer);
 	wlr_data_device_manager_create(server.wl_display);
 
-	server.seat = wlr_seat_create(server.wl_display, "seat0");
+	wxrc_input_init(&server);
 
 	wl_list_init(&server.views);
 	wxrc_xdg_shell_init(&server);

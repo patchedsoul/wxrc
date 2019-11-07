@@ -42,5 +42,6 @@ struct wxrc_xdg_shell_view {
 };
 
 void wxrc_xdg_shell_init(struct wxrc_server *server);
+void focus_view(struct wxrc_view *view, struct wlr_surface *surface);
 
 #endif

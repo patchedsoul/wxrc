@@ -24,6 +24,11 @@ struct wxrc_server {
 
 	struct wl_list views;
 
+	struct wl_list keyboards;
+	struct wl_list pointers;
+
+	struct wl_listener new_input;
+	struct wl_listener new_output;
 	struct wl_listener new_xdg_surface;
 };
 
