@@ -97,7 +97,7 @@ static GLuint wxrc_gl_compile_shader(GLuint type, const GLchar *src) {
 	if (!ok) {
 		char log[512];
 		glGetShaderInfoLog(shader, sizeof(log), NULL, log);
-		wlr_log(WLR_ERROR, "Failed to compile shader: %s\n", log);
+		wlr_log(WLR_ERROR, "Failed to compile shader: %s", log);
 		return 0;
 	}
 
@@ -160,7 +160,7 @@ bool wxrc_gl_init(struct wxrc_gl *gl) {
 		if (!ok) {
 			char log[512];
 			glGetProgramInfoLog(shader_program, sizeof(log), NULL, log);
-			wlr_log(WLR_ERROR, "Failed to link %s shader program: %s\n",
+			wlr_log(WLR_ERROR, "Failed to link %s shader program: %s",
 				job->name, log);
 			return false;
 		}
