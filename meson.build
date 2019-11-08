@@ -83,3 +83,5 @@ executable('wxrc',
 	include_directories: wxrc_inc,
 	install: true,
 )
+
+subdir('example')
