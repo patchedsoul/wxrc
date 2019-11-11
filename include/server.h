@@ -23,6 +23,7 @@ struct wxrc_server {
 
 	struct wlr_compositor *compositor;
 	struct wlr_xdg_shell *xdg_shell;
+	struct wxrc_xr_shell_v1 *xr_shell;
 
 	struct wl_list views;
 
@@ -38,6 +39,7 @@ struct wxrc_server {
 	struct wl_listener new_input;
 	struct wl_listener new_output;
 	struct wl_listener new_xdg_surface;
+	struct wl_listener new_xr_surface;
 };
 
 #endif

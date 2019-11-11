@@ -69,6 +69,7 @@ executable('wxrc',
 		'src/view.c',
 		'src/xdg-shell.c',
 		'src/xrutil.c',
+		'src/xr-shell.c',
 		'src/xr-shell-protocol.c',
 	),
 	dependencies: [

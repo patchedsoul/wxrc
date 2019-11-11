@@ -307,22 +307,34 @@ static void render_view(struct wxrc_gl *gl,
 		return;
 	}
 
-	int width = surface->current.buffer_width;
-	int height = surface->current.buffer_height;
+	mat4 mvp_matrix;
+	switch (view->view_type) {
+	case WXRC_VIEW_XDG_SHELL:
+	case WXRC_VIEW_XWAYLAND:;
+		int width = surface->current.buffer_width;
+		int height = surface->current.buffer_height;
 
-	float scale_x = width / 300.0;
-	float scale_y = height / 300.0;
+		mat4 model_matrix;
+		wxrc_view_get_model_matrix(view, model_matrix);
 
-	mat4 model_matrix;
-	wxrc_view_get_model_matrix(view, model_matrix);
+		float scale_x = width / 300.0;
+		float scale_y = height / 300.0;
 
-	glm_scale(model_matrix, (vec3){ scale_x, scale_y, 1.0 });
+		glm_scale(model_matrix, (vec3){ scale_x, scale_y, 1.0 });
 
-	/* Re-origin the view to the center */
-	glm_translate(model_matrix, (vec3){ -0.5, -0.5, 0.0 });
+		/* Re-origin the view to the center */
+		glm_translate(model_matrix, (vec3){ -0.5, -0.5, 0.0 });
 
-	mat4 mvp_matrix = GLM_MAT4_IDENTITY_INIT;
-	glm_mat4_mul(vp_matrix, model_matrix, mvp_matrix);
+		memcpy(mvp_matrix, vp_matrix, sizeof(mat4));
+		glm_mat4_mul(mvp_matrix, model_matrix, mvp_matrix);
+		break;
+	case WXRC_VIEW_XR_SHELL:
+		// Make the buffer fill the whole viewport
+		glm_mat4_identity(mvp_matrix);
+		glm_translate(mvp_matrix, (vec3){ -1.0, -1.0, 0.0 });
+		glm_scale(mvp_matrix, (vec3){ 2.0, 2.0, 1.0 });
+		break;
+	}
 
 	render_texture(gl, tex, mvp_matrix);
 }
@@ -382,19 +394,9 @@ void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 	glClearColor(bg_color[0], bg_color[1], bg_color[2], bg_color[3]);
 	glClear(GL_COLOR_BUFFER_BIT);
 
-	mat4 view_matrix;
-	versor orientation;
-	vec3 position;
-	wxrc_xr_quaternion_to_cglm(&xr_view->pose.orientation, orientation);
-	glm_quat_mat4(orientation, view_matrix);
-	wxrc_xr_vector3f_to_cglm(&xr_view->pose.position, position);
-	/* TODO: don't zero out Y-axis */
-	position[1] = 0;
-	glm_translate(view_matrix, position);
-	glm_mat4_inv(view_matrix, view_matrix);
-
-	mat4 projection_matrix;
-	wxrc_xr_projection_from_fov(&xr_view->fov, 0.05, 100.0, projection_matrix);
+	mat4 view_matrix, projection_matrix;
+	wxrc_get_view_matrix(xr_view, view_matrix);
+	wxrc_get_projection_matrix(xr_view, projection_matrix);
 
 	mat4 vp_matrix = GLM_MAT4_IDENTITY_INIT;
 	glm_mat4_mul(projection_matrix, view_matrix, vp_matrix);
@@ -412,4 +414,20 @@ void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 	render_cursor(server, &server->gl, view_matrix, vp_matrix);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void wxrc_get_view_matrix(XrView *xr_view, mat4 view_matrix) {
+	versor orientation;
+	vec3 position;
+	wxrc_xr_quaternion_to_cglm(&xr_view->pose.orientation, orientation);
+	glm_quat_mat4(orientation, view_matrix);
+	wxrc_xr_vector3f_to_cglm(&xr_view->pose.position, position);
+	/* TODO: don't zero out Y-axis */
+	position[1] = 0;
+	glm_translate(view_matrix, position);
+	glm_mat4_inv(view_matrix, view_matrix);
+}
+
+void wxrc_get_projection_matrix(XrView *xr_view, mat4 projection_matrix) {
+	wxrc_xr_projection_from_fov(&xr_view->fov, 0.05, 100.0, projection_matrix);
 }

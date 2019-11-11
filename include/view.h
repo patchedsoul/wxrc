@@ -16,6 +16,7 @@ struct wxrc_server;
 enum wxrc_view_type {
 	WXRC_VIEW_XDG_SHELL,
 	WXRC_VIEW_XWAYLAND,
+	WXRC_VIEW_XR_SHELL,
 };
 
 struct wxrc_view {
@@ -41,7 +42,16 @@ struct wxrc_xdg_shell_view {
 	struct wl_listener request_resize;
 };
 
+struct wxrc_xr_shell_view {
+	struct wxrc_view base;
+
+	struct wxrc_xr_surface_v1 *xr_surface;
+
+	struct wl_listener destroy;
+};
+
 void wxrc_xdg_shell_init(struct wxrc_server *server);
+void wxrc_xr_shell_init(struct wxrc_server *server);
 
 void wxrc_view_init(struct wxrc_view *view, struct wxrc_server *server,
 	enum wxrc_view_type type, struct wlr_surface *surface);

@@ -21,6 +21,7 @@
 #include "server.h"
 #include "view.h"
 #include "xrutil.h"
+#include "xr-shell-protocol.h"
 
 static XrResult wxrc_xr_view_push_frame(struct wxrc_xr_view *view,
 		struct wxrc_server *server, XrView *xr_view,
@@ -284,6 +285,7 @@ int main(int argc, char *argv[]) {
 
 	wl_list_init(&server.views);
 	wxrc_xdg_shell_init(&server);
+	wxrc_xr_shell_init(&server);
 
 	const char *wl_socket = wl_display_add_socket_auto(server.wl_display);
 	if (wl_socket == NULL) {
@@ -362,8 +364,23 @@ int main(int argc, char *argv[]) {
 		/* TODO: Derive this from predictedDisplayTime */
 		clock_gettime(CLOCK_MONOTONIC, &now);
 
+		mat4 view_matrix, projection_matrix, vp_matrix;
+		wxrc_get_view_matrix(&server.xr_views[0], view_matrix);
+		wxrc_get_projection_matrix(&server.xr_views[0], projection_matrix);
+		glm_mat4_mul(projection_matrix, view_matrix, vp_matrix);
+
 		struct wxrc_view *view;
 		wl_list_for_each(view, &server.views, link) {
+			if (view->view_type == WXRC_VIEW_XR_SHELL) {
+				struct wxrc_xr_shell_view *xr_view =
+					(struct wxrc_xr_shell_view *)view;
+
+				mat4 model_matrix, mvp_matrix;
+				wxrc_view_get_model_matrix(view, model_matrix);
+				glm_mat4_mul(vp_matrix, model_matrix, mvp_matrix);
+
+				wxrc_xr_surface_v1_send_matrix(xr_view->xr_surface, mvp_matrix);
+			}
 			wlr_surface_send_frame_done(view->surface, &now);
 		}
 	}
