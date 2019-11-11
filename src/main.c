@@ -325,6 +325,28 @@ static void send_frame_done_iterator(struct wlr_surface *surface,
 	wlr_surface_send_frame_done(surface, t);
 }
 
+static void xr_view_update_mvp_matricies(
+		struct wxrc_server *server, struct wxrc_zxr_shell_view *view) {
+	for (size_t i = 0; i < server->xr_backend->nviews; ++i) {
+		XrView *xrview = &server->xr_views[i];
+		struct wxrc_xr_view *wxrc_view = &server->xr_backend->views[i];
+
+		mat4 view_matrix, projection_matrix, vp_matrix;
+		wxrc_xr_view_get_matrix(xrview, view_matrix);
+		glm_mat4_inv(view_matrix, view_matrix);
+
+		wxrc_get_projection_matrix(xrview, projection_matrix);
+		glm_mat4_mul(projection_matrix, view_matrix, vp_matrix);
+
+		mat4 model_matrix, mvp_matrix;
+		wxrc_view_get_model_matrix(&view->base, model_matrix);
+		glm_mat4_mul(vp_matrix, model_matrix, mvp_matrix);
+
+		wxrc_zxr_surface_v1_send_mvp_matrix_for_view(
+				view->xr_surface, wxrc_view->wl_view, mvp_matrix);
+	}
+}
+
 int main(int argc, char *argv[]) {
 	struct wxrc_server server = {0};
 
@@ -407,6 +429,9 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
+	/* This needs to be done after the XR backend is started */
+	wxrc_xr_shell_init(&server, renderer);
+
 	setenv("WAYLAND_DISPLAY", wl_socket, true);
 	if (startup_cmd != NULL) {
 		pid_t pid = fork();
@@ -476,6 +501,10 @@ int main(int argc, char *argv[]) {
 
 		struct wxrc_view *view;
 		wl_list_for_each(view, &server.views, link) {
+			if (wxrc_view_is_xr_shell(view)) {
+				struct wxrc_zxr_shell_view *xr_view = (void *)view;
+				xr_view_update_mvp_matricies(&server, xr_view);
+			}
 			wxrc_view_for_each_surface(view, send_frame_done_iterator, &now);
 		}
 	}

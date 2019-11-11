@@ -9,6 +9,7 @@
 #if WLR_HAS_XWAYLAND
 #include <wlr/xwayland.h>
 #endif
+#include "xr-shell-protocol.h"
 #include "render.h"
 
 struct wxrc_server;
@@ -47,7 +48,17 @@ struct wxrc_xdg_shell_view {
 	struct wl_listener request_resize;
 };
 
+struct wxrc_zxr_shell_view {
+	struct wxrc_view base;
+
+	struct wxrc_zxr_surface_v1 *xr_surface;
+
+	struct wl_listener destroy;
+};
+
 void wxrc_xdg_shell_init(struct wxrc_server *server);
+void wxrc_xr_shell_init(struct wxrc_server *server,
+		struct wlr_renderer *renderer);
 
 void wxrc_view_init(struct wxrc_view *view, struct wxrc_server *server,
 	const struct wxrc_view_interface *impl, struct wlr_surface *surface);
@@ -63,5 +74,7 @@ void wxrc_view_for_each_surface(struct wxrc_view *view,
 	wlr_surface_iterator_func_t iterator, void *user_data);
 struct wlr_surface *wxrc_view_surface_at(struct wxrc_view *view,
 	double sx, double sy, double *child_sx, double *child_sy);
+
+bool wxrc_view_is_xr_shell(struct wxrc_view *view);
 
 #endif
