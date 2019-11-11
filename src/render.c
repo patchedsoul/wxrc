@@ -30,7 +30,6 @@ static const GLchar grid_fragment_shader_src[] =
 	"precision mediump float;\n"
 	"\n"
 	"uniform vec4 fg_color;\n"
-	"uniform vec4 bg_color;\n"
 	"\n"
 	"varying vec3 vertex_pos;\n"
 	"\n"
@@ -39,9 +38,9 @@ static const GLchar grid_fragment_shader_src[] =
 	"			fract(vertex_pos.y * 100.0) < 0.01) {\n"
 	"		float a = distance(vertex_pos, vec3(0)) * 7.0;\n"
 	"		a = min(a, 1.0);\n"
-	"		gl_FragColor = mix(fg_color, bg_color, a);\n"
+	"		gl_FragColor = mix(fg_color, vec4(0), a);\n"
 	"	} else {\n"
-	"		gl_FragColor = bg_color;\n"
+	"		gl_FragColor = vec4(0);\n"
 	"	}\n"
 	"}\n";
 
@@ -193,12 +192,10 @@ static void render_grid(struct wxrc_gl *gl, mat4 vp_matrix) {
 	GLint pos_loc = glGetAttribLocation(prog, "pos");
 	GLint mvp_loc = glGetUniformLocation(prog, "mvp");
 	GLint fg_color_loc = glGetUniformLocation(prog, "fg_color");
-	GLint bg_color_loc = glGetUniformLocation(prog, "bg_color");
 
 	glUseProgram(prog);
 
 	glUniform4fv(fg_color_loc, 1, (GLfloat *)fg_color);
-	glUniform4fv(bg_color_loc, 1, (GLfloat *)bg_color);
 
 	mat4 model_matrix;
 	glm_mat4_identity(model_matrix);
