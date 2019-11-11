@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <wayland-client.h>
 #include <wlr/render/wlr_renderer.h>
+#include <wlr/render/gles2.h>
 #include <wlr/util/log.h>
 #include "backend.h"
 #include "xrutil.h"
@@ -612,7 +613,7 @@ struct wxrc_xr_backend *wxrc_xr_backend_create(struct wl_display *display,
 	}
 	wlr_backend_init(&backend->base, &backend_impl);
 
-	backend->egl = wlr_renderer_get_egl(renderer);
+	backend->egl = wlr_gles2_renderer_get_egl(renderer);
 	backend->renderer = renderer;
 
 	if (!wxrc_xr_init(backend)) {
