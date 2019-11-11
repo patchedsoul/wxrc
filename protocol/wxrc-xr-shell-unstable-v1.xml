@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="wxrc_xr_shell_unstable_v1">
+  <interface name="zwxrc_xr_shell_v1" version="1">
+    <!-- TODO: multiple XR views -->
+    <request name="get_xr_surface">
+      <arg name="id" type="new_id" interface="zwxrc_xr_surface_v1"/>
+      <arg name="surface" type="object" interface="wl_surface"/>
+    </request>
+  </interface>
+
+  <interface name="zwxrc_xr_surface_v1" version="1">
+    <event name="mvp_matrix">
+      <arg name="matrix" type="array"/>
+    </event>
+  </interface>
+</protocol>

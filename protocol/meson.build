@@ -8,6 +8,7 @@ wayland_scanner = find_program(
 
 protocols = [
 	[wl_protocols_dir, 'stable/xdg-shell/xdg-shell.xml'],
+	['wxrc-xr-shell-unstable-v1.xml'],
 ]
 
 wl_protocols_src = []
