@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <cglm/cglm.h>
 #include <EGL/egl.h>
 #include <GLES2/gl2.h>
@@ -8,6 +9,7 @@
 #include <wayland-client-protocol.h>
 #include <wayland-egl.h>
 #include "xdg-shell-client-protocol.h"
+#include "wxrc-xr-shell-unstable-v1-client-protocol.h"
 
 static const size_t nvertices = 12 * 3; /* 6 faces → 12 triangles */
 static const GLfloat vertices[] = {
@@ -55,30 +57,47 @@ static const GLchar vertex_shader_src[] =
 	"attribute vec3 pos;\n"
 	"uniform mat4 mvp;\n"
 	"\n"
+	"varying vec3 vertex_pos;\n"
+	"\n"
 	"void main() {\n"
 	"	gl_Position = mvp * vec4(pos, 1.0);\n"
+	"	vertex_pos = pos;\n"
 	"}\n";
 
 static const GLchar fragment_shader_src[] =
 	"#version 100\n"
 	"precision mediump float;\n"
 	"\n"
+	"varying vec3 vertex_pos;\n"
+	"\n"
 	"void main() {\n"
-	"	gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);\n"
+	"	int n = 0;\n"
+	"	float thr = 0.01;\n"
+	"	if (1.0 - abs(vertex_pos.x) < thr) n++;\n"
+	"	if (1.0 - abs(vertex_pos.y) < thr) n++;\n"
+	"	if (1.0 - abs(vertex_pos.z) < thr) n++;\n"
+	"	if (n >= 2) {\n"
+	"		gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);\n"
+	"	} else {\n"
+	"		gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);\n"
+	"	}\n"
 	"}\n";
 
-static int width = 1024;
-static int height = 1024;
+static int width = 2160;
+static int height = 1200;
 static uint32_t xdg_configure_serial = 0;
+static mat4 vp_matrix;
 
 static bool running = true;
 
 static struct wl_compositor *compositor = NULL;
 static struct xdg_wm_base *xdg_wm_base = NULL;
+static struct zwxrc_xr_shell_v1 *xr_shell = NULL;
 
 static struct wl_surface *surface = NULL;
 static struct xdg_surface *xdg_surface = NULL;
 static struct xdg_toplevel *xdg_toplevel = NULL;
+static struct zwxrc_xr_surface_v1 *xr_surface = NULL;
 
 static struct wl_egl_window *egl_window = NULL;
 static EGLDisplay egl_display = EGL_NO_DISPLAY;
@@ -129,6 +148,16 @@ static const struct xdg_toplevel_listener xdg_toplevel_listener = {
 	.close = xdg_toplevel_handle_close,
 };
 
+static void xr_surface_handle_mvp_matrix(void *data,
+		struct zwxrc_xr_surface_v1 *xr_surface, struct wl_array *matrix) {
+	assert(matrix->size == sizeof(mat4));
+	memcpy(vp_matrix, matrix->data, matrix->size);
+}
+
+static const struct zwxrc_xr_surface_v1_listener xr_surface_listener = {
+	.mvp_matrix = xr_surface_handle_mvp_matrix,
+};
+
 static void handle_global(void *data, struct wl_registry *registry,
 		uint32_t name, const char *interface, uint32_t version) {
 	if (strcmp(interface, wl_compositor_interface.name) == 0) {
@@ -137,6 +166,9 @@ static void handle_global(void *data, struct wl_registry *registry,
 	} else if (strcmp(interface, xdg_wm_base_interface.name) == 0) {
 		xdg_wm_base =
 			wl_registry_bind(registry, name, &xdg_wm_base_interface, 1);
+	} else if (strcmp(interface, zwxrc_xr_shell_v1_interface.name) == 0) {
+		xr_shell =
+			wl_registry_bind(registry, name, &zwxrc_xr_shell_v1_interface, 1);
 	}
 }
 
@@ -200,20 +232,7 @@ static GLuint compile_program(void) {
 	return shader_program;
 }
 
-static void render(uint32_t time) {
-	if (xdg_configure_serial != 0) {
-		wl_egl_window_resize(egl_window, width, height, 0, 0);
-		xdg_surface_ack_configure(xdg_surface, xdg_configure_serial);
-		xdg_configure_serial = 0;
-	}
-
-	if (!eglMakeCurrent(egl_display, egl_surface, egl_surface, egl_context)) {
-		fprintf(stderr, "eglMakeCurrent failed\n");
-		return;
-	}
-
-	glViewport(0, 0, width, height);
-
+static void render_scene(uint32_t time, mat4 mvp_matrix) {
 	glClearColor(0.0, 0.0, 0.0, 0.0);
 	glClear(GL_COLOR_BUFFER_BIT);
 
@@ -221,22 +240,6 @@ static void render(uint32_t time) {
 	GLint mvp_loc = glGetUniformLocation(gl_prog, "mvp");
 
 	glUseProgram(gl_prog);
-
-	mat4 model_matrix = GLM_MAT4_IDENTITY_INIT;
-	glm_rotate_y(model_matrix, (float)time / 1000, model_matrix);
-
-	mat4 view_matrix;
-	vec3 eye = { 4.0, 3.0, 3.0 };
-	vec3 center = { 0.0, 0.0, 0.0 };
-	vec3 up = { 0.0, 1.0, 0.0 };
-	glm_lookat(eye, center, up, view_matrix);
-
-	mat4 projection_matrix;
-	glm_perspective_default((float)width / height, projection_matrix);
-
-	mat4 mvp_matrix = GLM_MAT4_IDENTITY_INIT;
-	glm_mat4_mul(projection_matrix, view_matrix, mvp_matrix);
-	glm_mat4_mul(mvp_matrix, model_matrix, mvp_matrix);
 
 	glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, (GLfloat *)mvp_matrix);
 
@@ -251,6 +254,46 @@ static void render(uint32_t time) {
 	glDisableVertexAttribArray(pos_loc);
 
 	glUseProgram(0);
+}
+
+static void render(uint32_t time) {
+	if (xdg_configure_serial != 0) {
+		wl_egl_window_resize(egl_window, width, height, 0, 0);
+		xdg_surface_ack_configure(xdg_surface, xdg_configure_serial);
+		xdg_configure_serial = 0;
+	}
+
+	if (!eglMakeCurrent(egl_display, egl_surface, egl_surface, egl_context)) {
+		fprintf(stderr, "eglMakeCurrent failed\n");
+		return;
+	}
+
+	glViewport(0, 0, width, height);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+
+	mat4 model_matrix = GLM_MAT4_IDENTITY_INIT;
+	glm_rotate_y(model_matrix, (float)time / 1000, model_matrix);
+	glm_scale_uni(model_matrix, 0.3);
+
+	mat4 mvp_matrix = GLM_MAT4_IDENTITY_INIT;
+	if (xr_shell != NULL) {
+		glm_mat4_mul(vp_matrix, model_matrix, mvp_matrix);
+	} else {
+		mat4 view_matrix;
+		vec3 eye = { 4.0, 3.0, 3.0 };
+		vec3 center = { 0.0, 0.0, 0.0 };
+		vec3 up = { 0.0, 1.0, 0.0 };
+		glm_lookat(eye, center, up, view_matrix);
+
+		mat4 projection_matrix;
+		glm_perspective_default((float)width / height, projection_matrix);
+
+		glm_mat4_mul(projection_matrix, view_matrix, mvp_matrix);
+		glm_mat4_mul(mvp_matrix, model_matrix, mvp_matrix);
+	}
+
+	render_scene(time, mvp_matrix);
 
 	struct wl_callback *callback = wl_surface_frame(surface);
 	wl_callback_add_listener(callback, &frame_listener, NULL);
@@ -318,11 +361,24 @@ int main(int argc, char *argv[]) {
 	}
 
 	surface = wl_compositor_create_surface(compositor);
-	xdg_surface = xdg_wm_base_get_xdg_surface(xdg_wm_base, surface);
-	xdg_toplevel = xdg_surface_get_toplevel(xdg_surface);
 
-	xdg_surface_add_listener(xdg_surface, &xdg_surface_listener, NULL);
-	xdg_toplevel_add_listener(xdg_toplevel, &xdg_toplevel_listener, NULL);
+	if (xr_shell != NULL) {
+		fprintf(stderr, "using xr-shell\n");
+
+		xr_surface = zwxrc_xr_shell_v1_get_xr_surface(xr_shell, surface);
+		zwxrc_xr_surface_v1_add_listener(xr_surface, &xr_surface_listener, NULL);
+	} else if (xdg_wm_base != NULL) {
+		fprintf(stderr, "using xdg-shell\n");
+
+		xdg_surface = xdg_wm_base_get_xdg_surface(xdg_wm_base, surface);
+		xdg_surface_add_listener(xdg_surface, &xdg_surface_listener, NULL);
+
+		xdg_toplevel = xdg_surface_get_toplevel(xdg_surface);
+		xdg_toplevel_add_listener(xdg_toplevel, &xdg_toplevel_listener, NULL);
+	} else {
+		fprintf(stderr, "no supported shell available\n");
+		return 1;
+	}
 
 	wl_surface_commit(surface);
 	wl_display_roundtrip(display);
@@ -358,10 +414,6 @@ int main(int argc, char *argv[]) {
 	while (wl_display_dispatch(display) != -1 && running) {
 		// This space intentionally left blank
 	}
-
-	xdg_toplevel_destroy(xdg_toplevel);
-	xdg_surface_destroy(xdg_surface);
-	wl_surface_destroy(surface);
 
 	return 0;
 }
