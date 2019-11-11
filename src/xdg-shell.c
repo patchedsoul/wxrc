@@ -54,7 +54,7 @@ static void handle_xdg_surface_unmap(struct wl_listener *listener, void *data) {
 static void handle_xdg_surface_destroy(
 		struct wl_listener *listener, void *data) {
 	struct wxrc_xdg_shell_view *view = wl_container_of(listener, view, destroy);
-	wl_list_remove(&view->base.link);
+	wxrc_view_finish(&view->base);
 	free(view);
 }
 
@@ -68,9 +68,8 @@ static void handle_new_xdg_surface(struct wl_listener *listener, void *data) {
 
 	struct wxrc_xdg_shell_view *view =
 		calloc(1, sizeof(struct wxrc_xdg_shell_view));
-	view->base.server = server;
-	view->base.view_type = WXRC_VIEW_XDG_SHELL;
-	view->base.surface = xdg_surface->surface;
+	wxrc_view_init(&view->base, server, WXRC_VIEW_XDG_SHELL,
+		xdg_surface->surface);
 	view->xdg_surface = xdg_surface;
 
 	view->map.notify = handle_xdg_surface_map;
@@ -79,8 +78,6 @@ static void handle_new_xdg_surface(struct wl_listener *listener, void *data) {
 	wl_signal_add(&xdg_surface->events.unmap, &view->unmap);
 	view->destroy.notify = handle_xdg_surface_destroy;
 	wl_signal_add(&xdg_surface->events.destroy, &view->destroy);
-
-	wl_list_insert(&server->views, &view->base.link);
 }
 
 void wxrc_xdg_shell_init(struct wxrc_server *server) {
