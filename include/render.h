@@ -24,4 +24,6 @@ void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 void wxrc_gl_render_xr_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 	XrView *xr_view, GLuint framebuffer, GLuint image);
 
+void wxrc_get_projection_matrix(XrView *xr_view, mat4 projection_matrix);
+
 #endif

@@ -9,6 +9,8 @@ wayland_scanner = find_program(
 protocols = [
 	[wl_protocols_dir, 'stable/xdg-shell/xdg-shell.xml'],
 	[wl_protocols_dir, 'unstable/pointer-constraints/pointer-constraints-unstable-v1.xml'],
+	[wl_protocols_dir, 'unstable/linux-dmabuf/linux-dmabuf-unstable-v1.xml'],
+	['zxr-shell-unstable-v1.xml'],
 ]
 
 wl_protocols_src = []

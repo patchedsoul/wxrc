@@ -10,6 +10,7 @@
 #include <wlr/types/wlr_xdg_shell.h>
 #include "input.h"
 #include "render.h"
+#include "xr-shell-protocol.h"
 
 struct wxrc_xr_backend;
 
@@ -24,6 +25,7 @@ struct wxrc_server {
 
 	struct wlr_compositor *compositor;
 	struct wlr_xdg_shell *xdg_shell;
+	struct wxrc_zxr_shell_v1 *xr_shell;
 
 	struct wl_seat *remote_seat;
 	struct wl_pointer *remote_pointer;
@@ -45,6 +47,7 @@ struct wxrc_server {
 	struct wl_listener new_input;
 	struct wl_listener new_output;
 	struct wl_listener new_xdg_surface;
+	struct wl_listener new_xr_surface;
 };
 
 #endif

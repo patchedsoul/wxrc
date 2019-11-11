@@ -317,7 +317,7 @@ static void render_surface_iterator(struct wlr_surface *surface,
 	render_texture(data->gl, surface->buffer->texture, mvp_matrix);
 }
 
-static void render_view(struct wxrc_gl *gl,
+static void render_2d_view(struct wxrc_gl *gl,
 		mat4 vp_matrix, struct wxrc_view *view) {
 	struct render_data data = {
 		.gl = gl,
@@ -326,6 +326,41 @@ static void render_view(struct wxrc_gl *gl,
 	glm_mat4_copy(vp_matrix, data.vp_matrix);
 
 	wxrc_view_for_each_surface(view, render_surface_iterator, &data);
+}
+
+static void render_xr_shell_view(struct wxrc_gl *gl, mat4 vp_matrix,
+		struct wxrc_xr_view *xr_view, struct wxrc_view *view) {
+	struct wlr_surface *surface = view->surface;
+
+	struct wlr_buffer *buffer = surface->buffer;
+	if (buffer == NULL) {
+		return;
+	}
+
+	/* TODO: Test for other kinds of buffers */
+	struct wxrc_zxr_composite_buffer_v1 *comp_buffer =
+		wxrc_zxr_composite_buffer_v1_from_buffer(buffer);
+	struct wlr_texture *tex = wxrc_zxr_composite_buffer_v1_for_view(
+		comp_buffer, xr_view->wl_view);
+	if (tex == NULL) {
+		/* TODO: Don't show on one view if we can't show on all views */
+		wlr_log(WLR_DEBUG, "Attempted to render XR surface without texture");
+		return;
+	}
+
+	mat4 mvp_matrix = GLM_MAT4_IDENTITY_INIT;
+	glm_translate(mvp_matrix, (vec3){ -1.0, -1.0, 0.0 });
+	glm_scale(mvp_matrix, (vec3){ 2.0, 2.0, 1.0 });
+	render_texture(gl, tex, mvp_matrix);
+}
+
+static void render_view(struct wxrc_gl *gl, mat4 vp_matrix,
+		struct wxrc_xr_view *xr_view, struct wxrc_view *view) {
+	if (wxrc_view_is_xr_shell(view)) {
+		render_xr_shell_view(gl, vp_matrix, xr_view, view);
+	} else {
+		render_2d_view(gl, vp_matrix, view);
+	}
 }
 
 static void render_cursor(struct wxrc_server *server,
@@ -370,7 +405,7 @@ void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 		if (!wxrc_view->mapped) {
 			continue;
 		}
-		render_view(&server->gl, vp_matrix, wxrc_view);
+		render_view(&server->gl, vp_matrix, view, wxrc_view);
 	}
 
 	if (server->seat->pointer_state.focused_surface != NULL) {
@@ -397,9 +432,13 @@ void wxrc_gl_render_xr_view(struct wxrc_server *server, struct wxrc_xr_view *vie
 	glm_mat4_inv(view_matrix, view_matrix);
 
 	mat4 projection_matrix;
-	wxrc_xr_projection_from_fov(&xr_view->fov, 0.05, 100.0, projection_matrix);
+	wxrc_get_projection_matrix(xr_view, projection_matrix);
 
 	wxrc_gl_render_view(server, view, view_matrix, projection_matrix);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void wxrc_get_projection_matrix(XrView *xr_view, mat4 projection_matrix) {
+	wxrc_xr_projection_from_fov(&xr_view->fov, 0.05, 100.0, projection_matrix);
 }

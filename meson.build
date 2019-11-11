@@ -36,6 +36,7 @@ add_project_arguments(cc.get_supported_arguments([
 
 cglm = dependency('cglm')
 egl = dependency('egl')
+gbm = dependency('gbm')
 glesv2 = dependency('glesv2')
 openxr = dependency('openxr')
 xkbcommon = dependency('xkbcommon')
@@ -70,6 +71,8 @@ executable('wxrc',
 		'src/render.c',
 		'src/view.c',
 		'src/xdg-shell.c',
+		'src/xr-shell-protocol.c',
+		'src/xr-shell.c',
 		'src/xrutil.c',
 	),
 	dependencies: [
@@ -86,3 +89,5 @@ executable('wxrc',
 	include_directories: wxrc_inc,
 	install: true,
 )
+
+subdir('example')
