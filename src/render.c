@@ -50,11 +50,15 @@ static const GLchar texture_vertex_shader_src[] =
 	"\n"
 	"attribute vec2 tex_coord;\n"
 	"uniform mat4 mvp;\n"
+	"uniform bool invert_y;\n"
 	"\n"
 	"varying vec2 vertex_tex_coord;\n"
 	"\n"
 	"void main() {\n"
 	"	vertex_tex_coord = tex_coord;\n"
+	"	if (invert_y) {\n"
+	"		vertex_tex_coord.y = 1.0 - vertex_tex_coord.y;\n"
+	"	}\n"
 	"	gl_Position = mvp * vec4(tex_coord, 0.0, 1.0);\n"
 	"}\n";
 
@@ -227,19 +231,8 @@ static void render_grid(struct wxrc_gl *gl, mat4 vp_matrix) {
 	glUseProgram(0);
 }
 
-static void render_view(struct wxrc_gl *gl,
-		mat4 vp_matrix, struct wxrc_view *view) {
-	/* TODO: Iterate over surface tree */
-	struct wlr_surface *surface = view->surface;
-
-	struct wlr_buffer *buffer = surface->buffer;
-	if (buffer == NULL) {
-		return;
-	}
-	struct wlr_texture *tex = buffer->texture;
-	if (tex == NULL) {
-		return;
-	}
+static void render_texture(struct wxrc_gl *gl, struct wlr_texture *tex,
+		mat4 mvp_matrix) {
 	if (!wlr_texture_is_gles2(tex)) {
 		wlr_log(WLR_ERROR, "unsupported texture type");
 		return;
@@ -247,9 +240,6 @@ static void render_view(struct wxrc_gl *gl,
 
 	struct wlr_gles2_texture_attribs attribs = {0};
 	wlr_gles2_texture_get_attribs(tex, &attribs);
-
-	int width, height;
-	wlr_texture_get_size(tex, &width, &height);
 
 	GLuint prog;
 	switch (attribs.target) {
@@ -268,6 +258,7 @@ static void render_view(struct wxrc_gl *gl,
 	GLint mvp_loc = glGetUniformLocation(prog, "mvp");
 	GLint tex_loc = glGetUniformLocation(prog, "tex");
 	GLint has_alpha_loc = glGetUniformLocation(prog, "has_alpha");
+	GLint invert_y_loc = glGetUniformLocation(prog, "invert_y");
 
 	glUseProgram(prog);
 
@@ -277,27 +268,11 @@ static void render_view(struct wxrc_gl *gl,
 	glTexParameteri(attribs.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glUniform1i(tex_loc, 0);
 
+	glUniform1i(invert_y_loc, !attribs.inverted_y);
+
 	if (has_alpha_loc >= 0) {
 		glUniform1i(has_alpha_loc, attribs.has_alpha);
 	}
-
-	float scale_x = width / 300.0;
-	float scale_y = (height / 300.0) * (attribs.inverted_y ? 1 : -1);
-
-	mat4 model_matrix;
-	glm_mat4_identity(model_matrix);
-
-	glm_translate(model_matrix, view->position);
-	glm_rotate(model_matrix, view->rotation[0], (vec3){ 1, 0, 0 });
-	glm_rotate(model_matrix, view->rotation[1], (vec3){ 0, 1, 0 });
-	glm_rotate(model_matrix, view->rotation[2], (vec3){ 0, 0, 1 });
-	glm_scale(model_matrix, (vec3){ scale_x, scale_y, 1.0 });
-
-	/* Re-origin the view to the center */
-	glm_translate(model_matrix, (vec3){ -0.5, -0.5, 0.0 });
-
-	mat4 mvp_matrix = GLM_MAT4_IDENTITY_INIT;
-	glm_mat4_mul(vp_matrix, model_matrix, mvp_matrix);
 
 	glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, (GLfloat *)mvp_matrix);
 
@@ -321,40 +296,57 @@ static void render_view(struct wxrc_gl *gl,
 	glUseProgram(0);
 }
 
+static void render_view(struct wxrc_gl *gl,
+		mat4 vp_matrix, struct wxrc_view *view) {
+	/* TODO: Iterate over surface tree */
+	struct wlr_surface *surface = view->surface;
+
+	struct wlr_buffer *buffer = surface->buffer;
+	if (buffer == NULL) {
+		return;
+	}
+	struct wlr_texture *tex = buffer->texture;
+	if (tex == NULL) {
+		return;
+	}
+
+	int width = surface->current.buffer_width;
+	int height = surface->current.buffer_height;
+
+	float scale_x = width / 300.0;
+	float scale_y = height / 300.0;
+
+	mat4 model_matrix;
+	glm_mat4_identity(model_matrix);
+
+	glm_translate(model_matrix, view->position);
+	glm_rotate(model_matrix, view->rotation[0], (vec3){ 1, 0, 0 });
+	glm_rotate(model_matrix, view->rotation[1], (vec3){ 0, 1, 0 });
+	glm_rotate(model_matrix, view->rotation[2], (vec3){ 0, 0, 1 });
+	glm_scale(model_matrix, (vec3){ scale_x, scale_y, 1.0 });
+
+	/* Re-origin the view to the center */
+	glm_translate(model_matrix, (vec3){ -0.5, -0.5, 0.0 });
+
+	mat4 mvp_matrix = GLM_MAT4_IDENTITY_INIT;
+	glm_mat4_mul(vp_matrix, model_matrix, mvp_matrix);
+
+	render_texture(gl, tex, mvp_matrix);
+}
+
 static void render_cursor(struct wxrc_server *server,
 		struct wxrc_gl *gl, mat4 view_matrix, mat4 vp_matrix) {
-	/* TODO: Could some of this be shared with render_view? */
 	struct wlr_texture *tex = server->cursor;
-
-	struct wlr_gles2_texture_attribs attribs = {0};
-	wlr_gles2_texture_get_attribs(tex, &attribs);
 
 	int width, height;
 	wlr_texture_get_size(tex, &width, &height);
-
-	GLuint prog = gl->texture_rgb_program;
-	GLint tex_coord_loc = glGetAttribLocation(prog, "tex_coord");
-	GLint mvp_loc = glGetUniformLocation(prog, "mvp");
-	GLint tex_loc = glGetUniformLocation(prog, "tex");
-	GLint has_alpha_loc = glGetUniformLocation(prog, "has_alpha");
-
-	glUseProgram(prog);
-
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(attribs.target, attribs.tex);
-	glTexParameteri(attribs.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(attribs.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glUniform1i(tex_loc, 0);
-	if (has_alpha_loc >= 0) {
-		glUniform1i(has_alpha_loc, attribs.has_alpha);
-	}
 
 	mat4 model_matrix;
 	glm_mat4_identity(model_matrix);
 
 	/* The scale is different here because we use a 2x cursor image */
 	float scale_x = width / 600.0;
-	float scale_y = (height / 600.0) * (attribs.inverted_y ? 1 : -1);
+	float scale_y = height / 600.0;
 
 	/* TODO: Set Z location to the surface it's currently entered */
 	vec3 pos;
@@ -377,26 +369,7 @@ static void render_cursor(struct wxrc_server *server,
 	mat4 mvp_matrix = GLM_MAT4_IDENTITY_INIT;
 	glm_mat4_mul(vp_matrix, model_matrix, mvp_matrix);
 
-	glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, (GLfloat *)mvp_matrix);
-
-	size_t npoints = 4;
-	const float points[] = {
-		0.0, 0.0,
-		0.0, 1.0,
-		1.0, 0.0,
-		1.0, 1.0,
-	};
-
-	GLint coords_per_point = sizeof(points) / sizeof(points[0]) / npoints;
-	glVertexAttribPointer(tex_coord_loc, coords_per_point,
-		GL_FLOAT, GL_FALSE, 0, points);
-	glEnableVertexAttribArray(tex_coord_loc);
-
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, npoints);
-
-	glDisableVertexAttribArray(tex_coord_loc);
-
-	glUseProgram(0);
+	render_texture(gl, tex, mvp_matrix);
 }
 
 void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
