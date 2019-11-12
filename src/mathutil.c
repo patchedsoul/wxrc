@@ -2,6 +2,12 @@
 #include "mathutil.h"
 #include "render.h"
 
+void wxrc_mat4_rotate(mat4 m, vec3 angles) {
+	glm_rotate(m, angles[0], (vec3){ 1, 0, 0 });
+	glm_rotate(m, angles[1], (vec3){ 0, 1, 0 });
+	glm_rotate(m, angles[2], (vec3){ 0, 0, 1 });
+}
+
 bool wxrc_intersect_plane_line(vec3 plane_point, vec3 plane_normal,
 		vec3 line_point, vec3 line_dir, vec3 intersection) {
 	vec3 pt_delta;
@@ -24,41 +30,36 @@ bool wxrc_intersect_plane_line(vec3 plane_point, vec3 plane_normal,
 	return true;
 }
 
-static void rotate_vec3_with_angles(vec3 angles, vec3 vec) {
-	glm_vec3_rotate(vec, angles[0], (vec3){ 1, 0, 0 });
-	glm_vec3_rotate(vec, angles[1], (vec3){ 0, 1, 0 });
-	glm_vec3_rotate(vec, -angles[2], (vec3){ 0, 0, 1 });
+static void vec3_rotate(vec3 angles, vec3 vec) {
+	// Note: don't apply rotations axis by axis, this doesn't work because it's
+	// not atomic.
+	mat4 m = GLM_MAT4_IDENTITY_INIT;
+	wxrc_mat4_rotate(m, angles);
+	glm_vec3_rotate_m4(m, vec, vec);
 }
 
-bool wxrc_intersect_surface_line(struct wlr_surface *surface,
+bool wxrc_intersect_surface_line(struct wlr_surface *surface, mat4 model_matrix,
 		vec3 surface_position, vec3 surface_rotation, vec3 line_position,
 		vec3 line_dir, vec3 intersection, float *sx_ptr, float *sy_ptr) {
 	vec3 surface_normal = { 0.0, 0.0, -1.0 };
-	rotate_vec3_with_angles(surface_rotation, surface_normal);
+	vec3_rotate(surface_rotation, surface_normal);
 
 	if (!wxrc_intersect_plane_line(surface_position, surface_normal,
 			line_position, line_dir, intersection)) {
 		return false;
 	}
 
-	vec3 delta;
-	glm_vec3_sub(intersection, surface_position, delta);
+	// Transform world coords into model coords
+	vec4 pos = { intersection[0], intersection[1], intersection[2], 1.0 };
+	mat4 inv_model_matrix;
+	glm_mat4_inv(model_matrix, inv_model_matrix);
+	glm_mat4_mulv(inv_model_matrix, pos, pos);
 
-	vec3 x_vec = { 1.0, 0.0, 0.0 };
-	rotate_vec3_with_angles(surface_rotation, x_vec);
+	float width = surface->current.buffer_width;
+	float height = surface->current.buffer_height;
 
-	vec3 y_vec = { 0.0, 1.0, 0.0 };
-	rotate_vec3_with_angles(surface_rotation, y_vec);
-
-	// Project delta in surface coordinate system
-	float x = glm_vec3_dot(x_vec, delta);
-	float y = -glm_vec3_dot(y_vec, delta);
-
-	// Scale and re-center surface coordinates
-	float width = surface->current.width;
-	float height = surface->current.height;
-	float sx = x * WXRC_SURFACE_SCALE + 0.5 * width;
-	float sy = y * WXRC_SURFACE_SCALE + 0.5 * height;
+	float sx = pos[0] * width;
+	float sy = (1.0 - pos[1]) * height;
 
 	if (sx >= 0 && sy >= 0 && sx < width && sy < height) {
 		*sx_ptr = sx;

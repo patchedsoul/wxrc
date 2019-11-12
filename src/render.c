@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <wlr/util/log.h>
 #include <wlr/render/gles2.h>
+#include "mathutil.h"
 #include "render.h"
 #include "server.h"
 #include "backend.h"
@@ -307,19 +308,8 @@ static void render_view(struct wxrc_gl *gl,
 		return;
 	}
 
-	int width = surface->current.buffer_width;
-	int height = surface->current.buffer_height;
-
-	float scale_x = width / WXRC_SURFACE_SCALE;
-	float scale_y = height / WXRC_SURFACE_SCALE;
-
 	mat4 model_matrix;
-	wxrc_view_get_model_matrix(view, model_matrix);
-
-	glm_scale(model_matrix, (vec3){ scale_x, scale_y, 1.0 });
-
-	/* Re-origin the view to the center */
-	glm_translate(model_matrix, (vec3){ -0.5, -0.5, 0.0 });
+	wxrc_view_get_2d_model_matrix(view, model_matrix);
 
 	mat4 mvp_matrix = GLM_MAT4_IDENTITY_INIT;
 	glm_mat4_mul(vp_matrix, model_matrix, mvp_matrix);
@@ -342,9 +332,7 @@ static void render_cursor(struct wxrc_server *server,
 	float scale_y = height / WXRC_SURFACE_SCALE / 2;
 
 	glm_translate(model_matrix, pos);
-	glm_rotate(model_matrix, rot[0], (vec3){ 1, 0, 0 });
-	glm_rotate(model_matrix, rot[1], (vec3){ 0, 1, 0 });
-	glm_rotate(model_matrix, rot[2], (vec3){ 0, 0, 1 });
+	wxrc_mat4_rotate(model_matrix, rot);
 	glm_scale(model_matrix, (vec3){ scale_x, scale_y, 1.0 });
 
 	/* Re-origin the cursor to the center (TODO: deal with hotspot here?) */

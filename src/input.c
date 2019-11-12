@@ -178,8 +178,11 @@ void wxrc_update_pointer(struct wxrc_server *server, XrView *xr_view,
 			continue;
 		}
 
+		mat4 model_matrix;
+		wxrc_view_get_2d_model_matrix(view, model_matrix);
+
 		vec3 intersection;
-		if (!wxrc_intersect_surface_line(view->surface, view->position,
+		if (!wxrc_intersect_surface_line(view->surface, model_matrix, view->position,
 				view->rotation, position, dir, intersection, &sx, &sy)) {
 			continue;
 		}
