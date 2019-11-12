@@ -52,7 +52,7 @@ bool wxrc_intersect_surface_line(struct wlr_surface *surface,
 
 	// Project delta in surface coordinate system
 	float x = glm_vec3_dot(x_vec, delta);
-	float y = glm_vec3_dot(y_vec, delta);
+	float y = -glm_vec3_dot(y_vec, delta);
 
 	// Scale and re-center surface coordinates
 	float width = surface->current.width;
