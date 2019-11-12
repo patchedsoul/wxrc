@@ -328,7 +328,7 @@ static void render_view(struct wxrc_gl *gl,
 }
 
 static void render_cursor(struct wxrc_server *server,
-		struct wxrc_gl *gl, mat4 view_matrix, mat4 vp_matrix, vec3 pos) {
+		struct wxrc_gl *gl, mat4 vp_matrix, vec3 pos, vec3 rot) {
 	struct wlr_texture *tex = server->cursor;
 
 	int width, height;
@@ -340,10 +340,6 @@ static void render_cursor(struct wxrc_server *server,
 	/* The scale is different here because we use a 2x cursor image */
 	float scale_x = width / WXRC_SURFACE_SCALE / 2;
 	float scale_y = height / WXRC_SURFACE_SCALE / 2;
-
-	vec3 rot;
-	glm_mat4_inv(view_matrix, view_matrix);
-	glm_euler_angles(view_matrix, rot);
 
 	glm_translate(model_matrix, pos);
 	glm_rotate(model_matrix, rot[0], (vec3){ 1, 0, 0 });
@@ -405,8 +401,8 @@ void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 	}
 
 	if (server->pointer_has_focus) {
-		render_cursor(server, &server->gl, view_matrix, vp_matrix,
-			server->pointer_position);
+		render_cursor(server, &server->gl, vp_matrix,
+			server->pointer_position, server->pointer_rotation);
 	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);

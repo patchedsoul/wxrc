@@ -170,6 +170,7 @@ void wxrc_update_pointer(struct wxrc_server *server, XrView *xr_view,
 	struct wlr_surface *focus = NULL;
 	float focus_dist = FLT_MAX;
 	vec3 pointer_pos;
+	vec3 pointer_rot;
 	float sx, sy;
 	struct wxrc_view *view;
 	wl_list_for_each(view, &server->views, link) {
@@ -192,6 +193,7 @@ void wxrc_update_pointer(struct wxrc_server *server, XrView *xr_view,
 			focus = view->surface;
 			focus_dist = dist;
 			glm_vec3_copy(intersection, pointer_pos);
+			glm_vec3_copy(view->rotation, pointer_rot);
 		}
 	}
 
@@ -200,6 +202,7 @@ void wxrc_update_pointer(struct wxrc_server *server, XrView *xr_view,
 		wlr_seat_pointer_notify_enter(server->seat, focus, sx, sy);
 		wlr_seat_pointer_notify_motion(server->seat, time, sx, sy);
 		glm_vec3_copy(pointer_pos, server->pointer_position);
+		glm_vec3_copy(pointer_rot, server->pointer_rotation);
 	} else {
 		wlr_seat_pointer_clear_focus(server->seat);
 	}
