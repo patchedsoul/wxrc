@@ -205,6 +205,45 @@ void wxrc_update_pointer(struct wxrc_server *server, XrView *xr_view,
 	}
 }
 
+static void pointer_handle_button(struct wl_listener *listener, void *data) {
+	struct wxrc_pointer *pointer = wl_container_of(listener, pointer, button);
+	struct wlr_event_pointer_button *event = data;
+
+	wlr_seat_pointer_notify_button(pointer->server->seat,
+		event->time_msec, event->button, event->state);
+}
+
+static void pointer_handle_axis(struct wl_listener *listener, void *data) {
+	struct wxrc_pointer *pointer = wl_container_of(listener, pointer, axis);
+	struct wlr_event_pointer_axis *event = data;
+
+	wlr_seat_pointer_notify_axis(pointer->server->seat,
+		event->time_msec, event->orientation, event->delta,
+		event->delta_discrete, event->source);
+}
+
+static void pointer_handle_frame(struct wl_listener *listener, void *data) {
+	struct wxrc_pointer *pointer = wl_container_of(listener, pointer, frame);
+
+	wlr_seat_pointer_notify_frame(pointer->server->seat);
+}
+
+static void handle_new_pointer(struct wxrc_server *server,
+		struct wlr_input_device *device) {
+	struct wxrc_pointer *pointer = calloc(1, sizeof(*pointer));
+	pointer->server = server;
+	pointer->device = device;
+
+	wl_list_insert(&server->pointers, &pointer->link);
+
+	pointer->button.notify = pointer_handle_button;
+	wl_signal_add(&device->pointer->events.button, &pointer->button);
+	pointer->axis.notify = pointer_handle_axis;
+	wl_signal_add(&device->pointer->events.axis, &pointer->axis);
+	pointer->frame.notify = pointer_handle_frame;
+	wl_signal_add(&device->pointer->events.frame, &pointer->frame);
+}
+
 void handle_new_input(struct wl_listener *listener, void *data) {
 	struct wxrc_server *server = wl_container_of(listener, server, new_input);
 	struct wlr_input_device *device = data;
@@ -214,7 +253,7 @@ void handle_new_input(struct wl_listener *listener, void *data) {
 		handle_new_keyboard(server, device);
 		break;
 	case WLR_INPUT_DEVICE_POINTER:
-		/* TODO */
+		handle_new_pointer(server, device);
 		break;
 	default:
 		break;

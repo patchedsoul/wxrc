@@ -16,6 +16,16 @@ struct wxrc_keyboard {
 	struct wl_listener key;
 };
 
+struct wxrc_pointer {
+	struct wl_list link;
+	struct wxrc_server *server;
+	struct wlr_input_device *device;
+
+	struct wl_listener button;
+	struct wl_listener axis;
+	struct wl_listener frame;
+};
+
 void wxrc_input_init(struct wxrc_server *server);
 void wxrc_update_pointer(struct wxrc_server *server, XrView *xr_view,
 	uint32_t time);
