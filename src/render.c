@@ -319,6 +319,7 @@ static void render_view(struct wxrc_gl *gl,
 
 static void render_cursor(struct wxrc_server *server,
 		struct wxrc_gl *gl, mat4 vp_matrix, vec3 pos, vec3 rot) {
+	struct wlr_xcursor_image *xcursor_image = server->xcursor_image;
 	struct wlr_texture *tex = server->cursor;
 
 	int width, height;
@@ -335,8 +336,10 @@ static void render_cursor(struct wxrc_server *server,
 	wxrc_mat4_rotate(model_matrix, rot);
 	glm_scale(model_matrix, (vec3){ scale_x, scale_y, 1.0 });
 
-	/* Re-origin the cursor to the center (TODO: deal with hotspot here?) */
-	glm_translate(model_matrix, (vec3){ -0.5, -0.5, 0.0 });
+	/* Re-origin the cursor to the center and apply hotspot */
+	glm_translate(model_matrix, (vec3){
+		-(float)xcursor_image->hotspot_x / width,
+		-1.0 + (float)xcursor_image->hotspot_y / height, 0 });
 
 	mat4 mvp_matrix = GLM_MAT4_IDENTITY_INIT;
 	glm_mat4_mul(vp_matrix, model_matrix, mvp_matrix);
