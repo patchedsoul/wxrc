@@ -1,11 +1,14 @@
+#include <limits.h>
 #include <stdlib.h>
 #include <wlr/types/wlr_input_device.h>
 #include <wlr/util/log.h>
 #include <xkbcommon/xkbcommon.h>
 #include <unistd.h>
 #include "input.h"
+#include "mathutil.h"
 #include "server.h"
 #include "view.h"
+#include "xrutil.h"
 
 void focus_view(struct wxrc_view *view, struct wlr_surface *surface) {
 	if (view == NULL) {
@@ -152,6 +155,56 @@ void handle_new_keyboard(struct wxrc_server *server,
 	wl_list_insert(&server->keyboards, &keyboard->link);
 }
 
+void wxrc_update_pointer(struct wxrc_server *server, XrView *xr_view,
+		uint32_t time) {
+	versor orientation;
+	vec3 position;
+	wxrc_xr_quaternion_to_cglm(&xr_view->pose.orientation, orientation);
+	wxrc_xr_vector3f_to_cglm(&xr_view->pose.position, position);
+	/* TODO: don't zero out Y-axis */
+	position[1] = 0;
+
+	vec3 dir = { 0.0, 0.0, -1.0 };
+	glm_quat_rotatev(orientation, dir, dir);
+
+	struct wlr_surface *focus = NULL;
+	float focus_dist = FLT_MAX;
+	vec3 pointer_pos;
+	float sx, sy;
+	struct wxrc_view *view;
+	wl_list_for_each(view, &server->views, link) {
+		if (!view->mapped) {
+			continue;
+		}
+
+		vec3 intersection;
+		if (!wxrc_intersect_surface_line(view->surface, view->position,
+				view->rotation, position, dir, intersection, &sx, &sy)) {
+			continue;
+		}
+
+		if (!wlr_surface_point_accepts_input(view->surface, sx, sy)) {
+			continue;
+		}
+
+		float dist = glm_vec3_distance(position, intersection);
+		if (dist < focus_dist) {
+			focus = view->surface;
+			focus_dist = dist;
+			glm_vec3_copy(intersection, pointer_pos);
+		}
+	}
+
+	server->pointer_has_focus = focus != NULL;
+	if (focus != NULL) {
+		wlr_seat_pointer_notify_enter(server->seat, focus, sx, sy);
+		wlr_seat_pointer_notify_motion(server->seat, time, sx, sy);
+		glm_vec3_copy(pointer_pos, server->pointer_position);
+	} else {
+		wlr_seat_pointer_clear_focus(server->seat);
+	}
+}
+
 void handle_new_input(struct wl_listener *listener, void *data) {
 	struct wxrc_server *server = wl_container_of(listener, server, new_input);
 	struct wlr_input_device *device = data;
@@ -190,9 +243,6 @@ void wxrc_input_init(struct wxrc_server *server) {
 			WL_SHM_FORMAT_ARGB8888, server->xcursor_image->width * 4,
 			server->xcursor_image->width, server->xcursor_image->height,
 			server->xcursor_image->buffer);
-	server->cursor_pos[0] = 0.0;
-	server->cursor_pos[1] = 0.0;
-	server->cursor_pos[2] = -2.0;
 
 	server->new_input.notify = handle_new_input;
 	wl_signal_add(&server->backend->events.new_input, &server->new_input);

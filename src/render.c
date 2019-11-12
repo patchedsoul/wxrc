@@ -310,8 +310,8 @@ static void render_view(struct wxrc_gl *gl,
 	int width = surface->current.buffer_width;
 	int height = surface->current.buffer_height;
 
-	float scale_x = width / 300.0;
-	float scale_y = height / 300.0;
+	float scale_x = width / WXRC_SURFACE_SCALE;
+	float scale_y = height / WXRC_SURFACE_SCALE;
 
 	mat4 model_matrix;
 	wxrc_view_get_model_matrix(view, model_matrix);
@@ -328,7 +328,7 @@ static void render_view(struct wxrc_gl *gl,
 }
 
 static void render_cursor(struct wxrc_server *server,
-		struct wxrc_gl *gl, mat4 view_matrix, mat4 vp_matrix) {
+		struct wxrc_gl *gl, mat4 view_matrix, mat4 vp_matrix, vec3 pos) {
 	struct wlr_texture *tex = server->cursor;
 
 	int width, height;
@@ -338,16 +338,11 @@ static void render_cursor(struct wxrc_server *server,
 	glm_mat4_identity(model_matrix);
 
 	/* The scale is different here because we use a 2x cursor image */
-	float scale_x = width / 600.0;
-	float scale_y = height / 600.0;
+	float scale_x = width / WXRC_SURFACE_SCALE / 2;
+	float scale_y = height / WXRC_SURFACE_SCALE / 2;
 
-	/* TODO: Set Z location to the surface it's currently entered */
-	vec3 pos;
-	glm_vec3_copy(server->cursor_pos, pos);
-	vec3 rot = { 0.0, 0.0, 0.0 };
-
+	vec3 rot;
 	glm_mat4_inv(view_matrix, view_matrix);
-	glm_vec3_rotate_m4(view_matrix, pos, pos);
 	glm_euler_angles(view_matrix, rot);
 
 	glm_translate(model_matrix, pos);
@@ -409,7 +404,10 @@ void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 		render_view(&server->gl, vp_matrix, wxrc_view);
 	}
 
-	render_cursor(server, &server->gl, view_matrix, vp_matrix);
+	if (server->pointer_has_focus) {
+		render_cursor(server, &server->gl, view_matrix, vp_matrix,
+			server->pointer_position);
+	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }

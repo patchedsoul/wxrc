@@ -353,6 +353,9 @@ int main(int argc, char *argv[]) {
 			break;
 		}
 
+		/* TODO: time from predictedDisplayTime */
+		wxrc_update_pointer(&server, &server.xr_views[0], 0);
+
 		if (!wxrc_xr_push_frame(&server, frame_state.predictedDisplayTime,
 				server.xr_views, projection_views)) {
 			return 1;

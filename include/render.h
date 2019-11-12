@@ -14,6 +14,8 @@ struct wxrc_gl {
 	GLuint texture_external_program;
 };
 
+#define WXRC_SURFACE_SCALE 300.0
+
 bool wxrc_gl_init(struct wxrc_gl *gl);
 void wxrc_gl_finish(struct wxrc_gl *gl);
 void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
