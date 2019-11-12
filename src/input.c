@@ -204,6 +204,7 @@ void wxrc_update_pointer(struct wxrc_server *server, XrView *xr_view,
 	if (focus != NULL) {
 		wlr_seat_pointer_notify_enter(server->seat, focus, sx, sy);
 		wlr_seat_pointer_notify_motion(server->seat, time, sx, sy);
+		wlr_seat_pointer_notify_frame(server->seat);
 		glm_vec3_copy(pointer_pos, server->pointer_position);
 		glm_vec3_copy(pointer_rot, server->pointer_rotation);
 	} else {
