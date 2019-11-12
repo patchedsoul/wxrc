@@ -11,6 +11,7 @@
 #include <wayland-server.h>
 #include <wlr/backend.h>
 #include <wlr/backend/multi.h>
+#include <wlr/backend/wayland.h>
 #include <wlr/types/wlr_data_device.h>
 #include <wlr/types/wlr_seat.h>
 #include <wlr/render/egl.h>
@@ -22,6 +23,7 @@
 #include "server.h"
 #include "view.h"
 #include "xrutil.h"
+#include "pointer-constraints-unstable-v1-client-protocol.h"
 
 static XrResult wxrc_xr_view_push_frame(struct wxrc_xr_view *view,
 		struct wxrc_server *server, XrView *xr_view,
@@ -265,6 +267,55 @@ static void handle_new_output(struct wl_listener *listener, void *data) {
 	wl_signal_add(&wlr_output->events.frame, &output->frame);
 	output->destroy.notify = output_handle_destroy;
 	wl_signal_add(&wlr_output->events.destroy, &output->destroy);
+
+	if (wlr_output_is_wl(wlr_output) &&
+			server->remote_pointer_constraints != NULL) {
+		struct wl_surface *surface = wlr_wl_output_get_surface(wlr_output);
+		zwp_pointer_constraints_v1_lock_pointer(
+			server->remote_pointer_constraints, surface, server->remote_pointer,
+			NULL, ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+	}
+}
+
+static void remote_handle_global(void *data, struct wl_registry *registry,
+		uint32_t name, const char *interface, uint32_t version) {
+	struct wxrc_server *server = data;
+
+	// TODO: multi-seat support
+	if (strcmp(interface, wl_seat_interface.name) == 0 &&
+			server->remote_seat == NULL) {
+		server->remote_seat = wl_registry_bind(registry, name,
+			&wl_seat_interface, 1);
+		server->remote_pointer = wl_seat_get_pointer(server->remote_seat);
+	} else if (strcmp(interface, zwp_pointer_constraints_v1_interface.name) == 0) {
+		server->remote_pointer_constraints = wl_registry_bind(registry, name,
+			&zwp_pointer_constraints_v1_interface, 1);
+	}
+}
+
+static void remote_handle_global_remove(void *data,
+		struct wl_registry *registry, uint32_t name) {
+	// This space is intentionally left blank
+}
+
+static const struct wl_registry_listener registry_listener = {
+	.global = remote_handle_global,
+	.global_remove = remote_handle_global_remove,
+};
+
+static void backend_iterator(struct wlr_backend *backend, void *data) {
+	struct wxrc_server *server = data;
+
+	if (!wlr_backend_is_wl(backend)) {
+		return;
+	}
+
+	struct wl_display *remote_display =
+		wlr_wl_backend_get_remote_display(backend);
+	struct wl_registry *registry = wl_display_get_registry(remote_display);
+	wl_registry_add_listener(registry, &registry_listener, server);
+
+	wl_display_roundtrip(remote_display);
 }
 
 int main(int argc, char *argv[]) {
@@ -308,6 +359,7 @@ int main(int argc, char *argv[]) {
 		wlr_log(WLR_ERROR, "Failed to create native backend");
 		return 1;
 	}
+	wlr_multi_for_each_backend(server.backend, backend_iterator, &server);
 
 	server.new_output.notify = handle_new_output;
 	wl_signal_add(&server.backend->events.new_output, &server.new_output);

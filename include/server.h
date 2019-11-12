@@ -24,6 +24,10 @@ struct wxrc_server {
 	struct wlr_compositor *compositor;
 	struct wlr_xdg_shell *xdg_shell;
 
+	struct wl_seat *remote_seat;
+	struct wl_pointer *remote_pointer;
+	struct zwp_pointer_constraints_v1 *remote_pointer_constraints;
+
 	struct wl_list views;
 
 	struct wlr_seat *seat;
