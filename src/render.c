@@ -345,23 +345,9 @@ static void render_cursor(struct wxrc_server *server,
 }
 
 void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
-		XrView *xr_view) {
+		mat4 view_matrix, mat4 projection_matrix) {
 	glClearColor(bg_color[0], bg_color[1], bg_color[2], bg_color[3]);
 	glClear(GL_COLOR_BUFFER_BIT);
-
-	mat4 view_matrix;
-	versor orientation;
-	vec3 position;
-	wxrc_xr_quaternion_to_cglm(&xr_view->pose.orientation, orientation);
-	glm_quat_mat4(orientation, view_matrix);
-	wxrc_xr_vector3f_to_cglm(&xr_view->pose.position, position);
-	/* TODO: don't zero out Y-axis */
-	position[1] = 0;
-	glm_translate(view_matrix, position);
-	glm_mat4_inv(view_matrix, view_matrix);
-
-	mat4 projection_matrix;
-	wxrc_xr_projection_from_fov(&xr_view->fov, 0.05, 100.0, projection_matrix);
 
 	mat4 vp_matrix = GLM_MAT4_IDENTITY_INIT;
 	glm_mat4_mul(projection_matrix, view_matrix, vp_matrix);
@@ -395,7 +381,13 @@ void wxrc_gl_render_xr_view(struct wxrc_server *server, struct wxrc_xr_view *vie
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
 		image, 0);
 
-	wxrc_gl_render_view(server, view, xr_view);
+	mat4 view_matrix;
+	wxrc_xr_view_get_matrix(xr_view, view_matrix);
+
+	mat4 projection_matrix;
+	wxrc_xr_projection_from_fov(&xr_view->fov, 0.05, 100.0, projection_matrix);
+
+	wxrc_gl_render_view(server, view, view_matrix, projection_matrix);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }

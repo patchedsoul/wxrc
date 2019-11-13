@@ -230,9 +230,18 @@ static void output_handle_frame(struct wl_listener *listener, void *data) {
 		return;
 	}
 
-	wlr_renderer_begin(renderer, output->output->width, output->output->height);
+	int width = output->output->width;
+	int height = output->output->height;
+
+	mat4 view_matrix;
+	wxrc_xr_view_get_matrix(&server->xr_views[0], view_matrix);
+
+	mat4 projection_matrix;
+	glm_perspective_default((float)width / height, projection_matrix);
+
+	wlr_renderer_begin(renderer, width, height);
 	wxrc_gl_render_view(server, &server->xr_backend->views[0],
-		&server->xr_views[0]);
+		view_matrix, projection_matrix);
 	wlr_renderer_end(renderer);
 	wlr_output_commit(output->output);
 }

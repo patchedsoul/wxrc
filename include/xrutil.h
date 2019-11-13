@@ -18,5 +18,6 @@ void wxrc_xr_projection_from_fov(const XrFovf *fov, float near_z, float far_z,
 
 void wxrc_xr_vector3f_to_cglm(const XrVector3f *in, vec3 out);
 void wxrc_xr_quaternion_to_cglm(const XrQuaternionf *in, versor out);
+void wxrc_xr_view_get_matrix(const XrView *xr_view, mat4 view_matrix);
 
 #endif

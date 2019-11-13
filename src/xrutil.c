@@ -345,3 +345,17 @@ void wxrc_xr_quaternion_to_cglm(const XrQuaternionf *in, versor out) {
 	out[2] = in->z;
 	out[3] = in->w;
 }
+
+void wxrc_xr_view_get_matrix(const XrView *xr_view, mat4 view_matrix) {
+	versor orientation;
+	wxrc_xr_quaternion_to_cglm(&xr_view->pose.orientation, orientation);
+
+	vec3 position;
+	wxrc_xr_vector3f_to_cglm(&xr_view->pose.position, position);
+	/* TODO: don't zero out Y-axis */
+	position[1] = 0;
+
+	glm_quat_mat4(orientation, view_matrix);
+	glm_translate(view_matrix, position);
+	glm_mat4_inv(view_matrix, view_matrix);
+}
