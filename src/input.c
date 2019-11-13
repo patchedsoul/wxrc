@@ -195,7 +195,8 @@ void wxrc_update_pointer(struct wxrc_server *server, XrView *xr_view,
 		}
 
 		float dist = glm_vec3_distance(position, intersection);
-		if (dist < focus_dist) {
+		// Add an epsilon to dist to avoid Z-index rounding errors fighting
+		if (dist + 0.01 < focus_dist) {
 			focus = view->surface;
 			focus_dist = dist;
 			glm_vec3_copy(intersection, cursor_pos);
