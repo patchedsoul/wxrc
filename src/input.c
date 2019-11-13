@@ -10,13 +10,11 @@
 #include "view.h"
 #include "xrutil.h"
 
-void focus_view(struct wxrc_view *view, struct wlr_surface *surface) {
+void focus_view(struct wxrc_view *view) {
 	if (view == NULL) {
 		return;
 	}
-	if (surface == NULL) {
-		surface = view->surface;
-	}
+	struct wlr_surface *surface = view->surface;
 
 	struct wxrc_server *server = view->server;
 	struct wlr_seat *seat = server->seat;
@@ -85,7 +83,7 @@ static bool handle_keybinding(struct wxrc_server *server, xkb_keysym_t sym) {
 			server->views.next, current_view, link);
 		struct wxrc_view *next_view = wl_container_of(
 			current_view->link.next, next_view, link);
-		focus_view(next_view, NULL);
+		focus_view(next_view);
 		wl_list_remove(&current_view->link);
 		wl_list_insert(server->views.prev, &current_view->link);
 		break;
