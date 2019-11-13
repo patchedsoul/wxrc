@@ -17,6 +17,7 @@
 #include <wlr/util/log.h>
 #include "backend.h"
 #include "input.h"
+#include "output.h"
 #include "render.h"
 #include "server.h"
 #include "view.h"
@@ -220,6 +221,43 @@ static void output_bind(struct wl_client *wl_client, void *data,
 	send_done(resource);
 }
 
+static void output_handle_frame(struct wl_listener *listener, void *data) {
+	struct wxrc_output *output = wl_container_of(listener, output, frame);
+	struct wxrc_server *server = output->server;
+	struct wlr_renderer *renderer = wlr_backend_get_renderer(server->backend);
+
+	if (!wlr_output_attach_render(output->output, NULL)) {
+		return;
+	}
+
+	wlr_renderer_begin(renderer, output->output->width, output->output->height);
+	wxrc_gl_render_view(server, &server->xr_backend->views[0],
+		&server->xr_views[0]);
+	wlr_renderer_end(renderer);
+	wlr_output_commit(output->output);
+}
+
+static void output_handle_destroy(struct wl_listener *listener, void *data) {
+	struct wxrc_output *output = wl_container_of(listener, output, destroy);
+	wl_list_remove(&output->frame.link);
+	wl_list_remove(&output->destroy.link);
+	free(output);
+}
+
+static void handle_new_output(struct wl_listener *listener, void *data) {
+	struct wxrc_server *server = wl_container_of(listener, server, new_output);
+	struct wlr_output *wlr_output = data;
+
+	struct wxrc_output *output = calloc(1, sizeof(*output));
+	output->output = wlr_output;
+	output->server = server;
+
+	output->frame.notify = output_handle_frame;
+	wl_signal_add(&wlr_output->events.frame, &output->frame);
+	output->destroy.notify = output_handle_destroy;
+	wl_signal_add(&wlr_output->events.destroy, &output->destroy);
+}
+
 int main(int argc, char *argv[]) {
 	struct wxrc_server server = {0};
 
@@ -261,6 +299,9 @@ int main(int argc, char *argv[]) {
 		wlr_log(WLR_ERROR, "Failed to create native backend");
 		return 1;
 	}
+
+	server.new_output.notify = handle_new_output;
+	wl_signal_add(&server.backend->events.new_output, &server.new_output);
 
 	struct wlr_renderer *renderer = wlr_backend_get_renderer(server.backend);
 	server.xr_backend = wxrc_xr_backend_create(server.wl_display, renderer);
