@@ -174,7 +174,7 @@ void wxrc_update_pointer(struct wxrc_server *server, XrView *xr_view,
 	float focus_dist = FLT_MAX;
 	vec3 cursor_pos;
 	vec3 cursor_rot;
-	float sx, sy;
+	float focus_sx, focus_sy;
 	struct wxrc_view *view;
 	wl_list_for_each(view, &server->views, link) {
 		if (!view->mapped) {
@@ -185,6 +185,7 @@ void wxrc_update_pointer(struct wxrc_server *server, XrView *xr_view,
 		wxrc_view_get_2d_model_matrix(view, model_matrix);
 
 		vec3 intersection;
+		float sx, sy;
 		if (!wxrc_intersect_surface_line(view->surface, model_matrix, view->position,
 				view->rotation, position, dir, intersection, &sx, &sy)) {
 			continue;
@@ -198,6 +199,8 @@ void wxrc_update_pointer(struct wxrc_server *server, XrView *xr_view,
 		// Add an epsilon to dist to avoid Z-index rounding errors fighting
 		if (dist + 0.01 < focus_dist) {
 			focus = view->surface;
+			focus_sx = sx;
+			focus_sy = sy;
 			focus_dist = dist;
 			glm_vec3_copy(intersection, cursor_pos);
 			glm_vec3_copy(view->rotation, cursor_rot);
@@ -206,8 +209,8 @@ void wxrc_update_pointer(struct wxrc_server *server, XrView *xr_view,
 
 	server->pointer_has_focus = focus != NULL;
 	if (focus != NULL) {
-		wlr_seat_pointer_notify_enter(server->seat, focus, sx, sy);
-		wlr_seat_pointer_notify_motion(server->seat, time, sx, sy);
+		wlr_seat_pointer_notify_enter(server->seat, focus, focus_sx, focus_sy);
+		wlr_seat_pointer_notify_motion(server->seat, time, focus_sx, focus_sy);
 		wlr_seat_pointer_notify_frame(server->seat);
 
 		glm_mat4_identity(server->cursor_matrix);
