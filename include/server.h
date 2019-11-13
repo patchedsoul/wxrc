@@ -35,6 +35,7 @@ struct wxrc_server {
 	struct wlr_xcursor_image *xcursor_image;
 	struct wlr_texture *cursor;
 	bool pointer_has_focus;
+	vec3 pointer_rotation; /* relative to the first XR view's orientation */
 	mat4 cursor_matrix;
 
 	struct wl_list keyboards;
