@@ -318,22 +318,19 @@ static void render_view(struct wxrc_gl *gl,
 }
 
 static void render_cursor(struct wxrc_server *server,
-		struct wxrc_gl *gl, mat4 vp_matrix, vec3 pos, vec3 rot) {
+		struct wxrc_gl *gl, mat4 vp_matrix, mat4 cursor_matrix) {
 	struct wlr_xcursor_image *xcursor_image = server->xcursor_image;
 	struct wlr_texture *tex = server->cursor;
 
 	int width, height;
 	wlr_texture_get_size(tex, &width, &height);
 
-	mat4 model_matrix;
-	glm_mat4_identity(model_matrix);
-
 	/* The scale is different here because we use a 2x cursor image */
 	float scale_x = width / WXRC_SURFACE_SCALE / 2;
 	float scale_y = height / WXRC_SURFACE_SCALE / 2;
 
-	glm_translate(model_matrix, pos);
-	wxrc_mat4_rotate(model_matrix, rot);
+	mat4 model_matrix;
+	glm_mat4_copy(cursor_matrix, model_matrix);
 	glm_scale(model_matrix, (vec3){ scale_x, scale_y, 1.0 });
 
 	/* Re-origin the cursor to the center and apply hotspot */
@@ -392,8 +389,7 @@ void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 	}
 
 	if (server->pointer_has_focus) {
-		render_cursor(server, &server->gl, vp_matrix,
-			server->cursor_position, server->cursor_rotation);
+		render_cursor(server, &server->gl, vp_matrix, server->cursor_matrix);
 	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);

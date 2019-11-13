@@ -205,8 +205,10 @@ void wxrc_update_pointer(struct wxrc_server *server, XrView *xr_view,
 		wlr_seat_pointer_notify_enter(server->seat, focus, sx, sy);
 		wlr_seat_pointer_notify_motion(server->seat, time, sx, sy);
 		wlr_seat_pointer_notify_frame(server->seat);
-		glm_vec3_copy(cursor_pos, server->cursor_position);
-		glm_vec3_copy(cursor_rot, server->cursor_rotation);
+
+		glm_mat4_identity(server->cursor_matrix);
+		glm_translate(server->cursor_matrix, cursor_pos);
+		wxrc_mat4_rotate(server->cursor_matrix, cursor_rot);
 	} else {
 		wlr_seat_pointer_clear_focus(server->seat);
 	}
