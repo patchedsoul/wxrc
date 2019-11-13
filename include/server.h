@@ -31,8 +31,8 @@ struct wxrc_server {
 	struct wlr_xcursor_image *xcursor_image;
 	struct wlr_texture *cursor;
 	bool pointer_has_focus;
-	vec3 pointer_position;
-	vec3 pointer_rotation;
+	vec3 cursor_position;
+	vec3 cursor_rotation;
 
 	struct wl_list keyboards;
 	struct wl_list pointers;

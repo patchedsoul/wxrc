@@ -393,7 +393,7 @@ void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 
 	if (server->pointer_has_focus) {
 		render_cursor(server, &server->gl, vp_matrix,
-			server->pointer_position, server->pointer_rotation);
+			server->cursor_position, server->cursor_rotation);
 	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
