@@ -345,19 +345,7 @@ static void render_cursor(struct wxrc_server *server,
 }
 
 void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
-		XrView *xr_view, GLuint framebuffer, GLuint image) {
-	uint32_t width = view->config.recommendedImageRectWidth;
-	uint32_t height = view->config.recommendedImageRectHeight;
-
-	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-
-	glViewport(0, 0, width, height);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-		image, 0);
-
+		XrView *xr_view) {
 	glClearColor(bg_color[0], bg_color[1], bg_color[2], bg_color[3]);
 	glClear(GL_COLOR_BUFFER_BIT);
 
@@ -391,6 +379,23 @@ void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 	if (server->pointer_has_focus) {
 		render_cursor(server, &server->gl, vp_matrix, server->cursor_matrix);
 	}
+}
+
+void wxrc_gl_render_xr_view(struct wxrc_server *server, struct wxrc_xr_view *view,
+		XrView *xr_view, GLuint framebuffer, GLuint image) {
+	uint32_t width = view->config.recommendedImageRectWidth;
+	uint32_t height = view->config.recommendedImageRectHeight;
+
+	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+
+	glViewport(0, 0, width, height);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+		image, 0);
+
+	wxrc_gl_render_view(server, view, xr_view);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }

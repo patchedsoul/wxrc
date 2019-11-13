@@ -19,6 +19,8 @@ struct wxrc_gl {
 bool wxrc_gl_init(struct wxrc_gl *gl);
 void wxrc_gl_finish(struct wxrc_gl *gl);
 void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
+	XrView *xr_view);
+void wxrc_gl_render_xr_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 	XrView *xr_view, GLuint framebuffer, GLuint image);
 
 #endif
