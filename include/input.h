@@ -21,6 +21,7 @@ struct wxrc_pointer {
 	struct wxrc_server *server;
 	struct wlr_input_device *device;
 
+	struct wl_listener motion;
 	struct wl_listener button;
 	struct wl_listener axis;
 	struct wl_listener frame;

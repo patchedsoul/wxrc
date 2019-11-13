@@ -165,7 +165,10 @@ void wxrc_update_pointer(struct wxrc_server *server, XrView *xr_view,
 	position[1] = 0;
 
 	vec3 dir = { 0.0, 0.0, -1.0 };
-	glm_quat_rotatev(orientation, dir, dir);
+	mat4 pointer_rot_matrix;
+	glm_quat_mat4(orientation, pointer_rot_matrix);
+	wxrc_mat4_rotate(pointer_rot_matrix, server->pointer_rotation);
+	glm_vec3_rotate_m4(pointer_rot_matrix, dir, dir);
 
 	struct wlr_surface *focus = NULL;
 	float focus_dist = FLT_MAX;
@@ -214,6 +217,33 @@ void wxrc_update_pointer(struct wxrc_server *server, XrView *xr_view,
 	}
 }
 
+static void clamp(float *f, float min, float max) {
+	if (*f < min) {
+		*f = min;
+	}
+	if (*f > max) {
+		*f = max;
+	}
+}
+
+static void pointer_handle_motion(struct wl_listener *listener, void *data) {
+	struct wxrc_pointer *pointer = wl_container_of(listener, pointer, motion);
+	struct wxrc_server *server = pointer->server;
+	struct wlr_event_pointer_motion *event = data;
+
+	server->pointer_rotation[1] += -event->delta_x * 0.001;
+	server->pointer_rotation[0] += -event->delta_y * 0.001;
+
+	XrFovf *fov = &server->xr_views[0].fov;
+	float angle_padding = glm_rad(20);
+	clamp(&server->pointer_rotation[0],
+		fmin(fov->angleLeft, fov->angleRight) + angle_padding,
+		fmax(fov->angleLeft, fov->angleRight) - angle_padding);
+	clamp(&server->pointer_rotation[1],
+		fmin(fov->angleUp, fov->angleDown) + angle_padding,
+		fmax(fov->angleUp, fov->angleDown) - angle_padding);
+}
+
 static void pointer_handle_button(struct wl_listener *listener, void *data) {
 	struct wxrc_pointer *pointer = wl_container_of(listener, pointer, button);
 	struct wlr_event_pointer_button *event = data;
@@ -245,6 +275,8 @@ static void handle_new_pointer(struct wxrc_server *server,
 
 	wl_list_insert(&server->pointers, &pointer->link);
 
+	pointer->motion.notify = pointer_handle_motion;
+	wl_signal_add(&device->pointer->events.motion, &pointer->motion);
 	pointer->button.notify = pointer_handle_button;
 	wl_signal_add(&device->pointer->events.button, &pointer->button);
 	pointer->axis.notify = pointer_handle_axis;
