@@ -362,7 +362,7 @@ void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 		render_view(&server->gl, vp_matrix, wxrc_view);
 	}
 
-	if (server->pointer_has_focus) {
+	if (server->seat->pointer_state.focused_surface != NULL) {
 		render_cursor(server, &server->gl, vp_matrix, server->cursor_matrix);
 	}
 }
