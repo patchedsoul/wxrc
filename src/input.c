@@ -320,9 +320,10 @@ static void pointer_handle_button(struct wl_listener *listener, void *data) {
 		mat4 cursor_matrix;
 		struct wxrc_view *view = view_at(server, &server->xr_views[0],
 			cursor_matrix, NULL, NULL, NULL);
-		if (view != NULL) {
-			focus_view(view);
+		if (view == NULL) {
+			break;
 		}
+		focus_view(view);
 
 		bool meta_pressed = false;
 		struct wxrc_keyboard *keyboard;
