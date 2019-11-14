@@ -260,7 +260,7 @@ static void update_pointer_move(struct wxrc_server *server, XrView *xr_view) {
 	wxrc_xr_view_get_matrix(xr_view, view_matrix);
 	wxrc_mat4_rotate(view_matrix, server->pointer_rotation);
 
-	vec3 pos = { 0.0, 0.0, -2.0 };
+	vec3 pos = { 0.0, 0.0, -glm_vec3_norm(view->position) };
 	glm_vec3_rotate_m4(view_matrix, pos, pos);
 
 	vec3 rot;
