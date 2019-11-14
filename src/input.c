@@ -315,28 +315,35 @@ static void pointer_handle_button(struct wl_listener *listener, void *data) {
 	struct wxrc_server *server = pointer->server;
 	struct wlr_event_pointer_button *event = data;
 
-	if (event->state == WLR_BUTTON_PRESSED) {
+	switch (event->state) {
+	case WLR_BUTTON_PRESSED:;
 		mat4 cursor_matrix;
 		struct wxrc_view *view = view_at(server, &server->xr_views[0],
 			cursor_matrix, NULL, NULL, NULL);
 		if (view != NULL) {
 			focus_view(view);
 		}
-	}
 
-	bool meta_pressed = false;
-	struct wxrc_keyboard *keyboard;
-	wl_list_for_each(keyboard, &server->keyboards, link) {
-		if (keyboard_meta_pressed(keyboard)) {
-			meta_pressed = true;
-			break;
+		bool meta_pressed = false;
+		struct wxrc_keyboard *keyboard;
+		wl_list_for_each(keyboard, &server->keyboards, link) {
+			if (keyboard_meta_pressed(keyboard)) {
+				meta_pressed = true;
+				break;
+			}
 		}
-	}
 
-	if (meta_pressed) {
-		server->seatop = (event->state == WLR_BUTTON_PRESSED) ?
-			WXRC_SEATOP_MOVE : WXRC_SEATOP_DEFAULT;
-		return;
+		if (meta_pressed) {
+			server->seatop = WXRC_SEATOP_MOVE;
+			return;
+		}
+		break;
+	case WLR_BUTTON_RELEASED:
+		if (server->seatop != WXRC_SEATOP_DEFAULT) {
+			server->seatop = WXRC_SEATOP_DEFAULT;
+			return;
+		}
+		break;
 	}
 
 	wlr_seat_pointer_notify_button(server->seat,
