@@ -44,6 +44,13 @@ static void handle_xdg_surface_unmap(struct wl_listener *listener, void *data) {
 	}
 }
 
+static void handle_xdg_surface_request_move(
+		struct wl_listener *listener, void *data) {
+	struct wxrc_xdg_shell_view *view =
+		wl_container_of(listener, view, request_move);
+	wxrc_view_begin_move(&view->base);
+}
+
 static void handle_xdg_surface_destroy(
 		struct wl_listener *listener, void *data) {
 	struct wxrc_xdg_shell_view *view = wl_container_of(listener, view, destroy);
@@ -69,6 +76,9 @@ static void handle_new_xdg_surface(struct wl_listener *listener, void *data) {
 	wl_signal_add(&xdg_surface->events.map, &view->map);
 	view->unmap.notify = handle_xdg_surface_unmap;
 	wl_signal_add(&xdg_surface->events.unmap, &view->unmap);
+	view->request_move.notify = handle_xdg_surface_request_move;
+	wl_signal_add(&xdg_surface->toplevel->events.request_move,
+		&view->request_move);
 	view->destroy.notify = handle_xdg_surface_destroy;
 	wl_signal_add(&xdg_surface->events.destroy, &view->destroy);
 }

@@ -45,3 +45,13 @@ struct wxrc_view *wxrc_get_focus(struct wxrc_server *server) {
 	struct wxrc_view *view = wl_container_of(server->views.next, view, link);
 	return view;
 }
+
+void wxrc_view_begin_move(struct wxrc_view *view) {
+	struct wxrc_server *server = view->server;
+	if (wxrc_get_focus(server) != view ||
+			server->seatop != WXRC_SEATOP_DEFAULT) {
+		return;
+	}
+	wlr_seat_pointer_clear_focus(server->seat);
+	server->seatop = WXRC_SEATOP_MOVE;
+}
