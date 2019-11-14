@@ -157,8 +157,9 @@ void handle_new_keyboard(struct wxrc_server *server,
 	wl_list_insert(&server->keyboards, &keyboard->link);
 }
 
-static void update_pointer_default(struct wxrc_server *server, XrView *xr_view,
-		uint32_t time) {
+static struct wxrc_view *view_at(struct wxrc_server *server, XrView *xr_view,
+		mat4 cursor_matrix, struct wlr_surface **surface_ptr,
+		float *sx_ptr, float *sy_ptr) {
 	versor orientation;
 	vec3 position;
 	wxrc_xr_quaternion_to_cglm(&xr_view->pose.orientation, orientation);
@@ -209,14 +210,31 @@ static void update_pointer_default(struct wxrc_server *server, XrView *xr_view,
 		}
 	}
 
-	if (focus != NULL) {
-		wlr_seat_pointer_notify_enter(server->seat, focus, focus_sx, focus_sy);
-		wlr_seat_pointer_notify_motion(server->seat, time, focus_sx, focus_sy);
-		wlr_seat_pointer_notify_frame(server->seat);
+	if (focus == NULL) {
+		return NULL;
+	}
 
-		glm_mat4_identity(server->cursor_matrix);
-		glm_translate(server->cursor_matrix, cursor_pos);
-		wxrc_mat4_rotate(server->cursor_matrix, cursor_rot);
+	*surface_ptr = focus;
+	*sx_ptr = focus_sx;
+	*sy_ptr = focus_sy;
+
+	glm_mat4_identity(cursor_matrix);
+	glm_translate(cursor_matrix, cursor_pos);
+	wxrc_mat4_rotate(cursor_matrix, cursor_rot);
+
+	return view;
+}
+
+static void update_pointer_default(struct wxrc_server *server, XrView *xr_view,
+		uint32_t time) {
+	float sx, sy;
+	struct wlr_surface *surface;
+	struct wxrc_view *focus = view_at(server, xr_view, server->cursor_matrix,
+		&surface, &sx, &sy);
+	if (focus != NULL) {
+		wlr_seat_pointer_notify_enter(server->seat, surface, sx, sy);
+		wlr_seat_pointer_notify_motion(server->seat, time, sx, sy);
+		wlr_seat_pointer_notify_frame(server->seat);
 	} else {
 		wlr_seat_pointer_clear_focus(server->seat);
 	}
