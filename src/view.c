@@ -37,3 +37,11 @@ void wxrc_view_get_2d_model_matrix(struct wxrc_view *view, mat4 model_matrix) {
 	/* Re-origin the view to the center */
 	glm_translate(model_matrix, (vec3){ -0.5, -0.5, 0.0 });
 }
+
+struct wxrc_view *wxrc_get_focus(struct wxrc_server *server) {
+	if (wl_list_empty(&server->views)) {
+		return NULL;
+	}
+	struct wxrc_view *view = wl_container_of(server->views.prev, view, link);
+	return view;
+}
