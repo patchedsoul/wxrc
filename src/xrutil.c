@@ -357,5 +357,4 @@ void wxrc_xr_view_get_matrix(const XrView *xr_view, mat4 view_matrix) {
 
 	glm_quat_mat4(orientation, view_matrix);
 	glm_translate(view_matrix, position);
-	glm_mat4_inv(view_matrix, view_matrix);
 }

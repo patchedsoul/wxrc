@@ -9,23 +9,16 @@
 
 static void handle_xdg_surface_map(struct wl_listener *listener, void *data) {
 	struct wxrc_xdg_shell_view *view = wl_container_of(listener, view, map);
-	vec3 pos = { 0.0, 0.0, -2.0 };
-	vec3 rot = { 0.0, 0.0, 0.0 };
-
-	/* TODO: Move this into shared code */
-	mat4 view_matrix;
-	versor orientation;
-	vec3 position;
 
 	XrView *xr_view = &view->base.server->xr_views[0];
-	wxrc_xr_vector3f_to_cglm(&xr_view->pose.position, position);
-	position[1] = 0; /* TODO: don't zero out Y-axis */
-	wxrc_xr_quaternion_to_cglm(&xr_view->pose.orientation, orientation);
 
-	glm_quat_mat4(orientation, view_matrix);
-	glm_translate(view_matrix, position);
+	mat4 view_matrix;
+	wxrc_xr_view_get_matrix(xr_view, view_matrix);
+
+	vec3 pos = { 0.0, 0.0, -2.0 };
 	glm_vec3_rotate_m4(view_matrix, pos, pos);
 
+	vec3 rot;
 	glm_euler_angles(view_matrix, rot);
 
 	glm_vec3_copy(pos, view->base.position);

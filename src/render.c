@@ -383,6 +383,7 @@ void wxrc_gl_render_xr_view(struct wxrc_server *server, struct wxrc_xr_view *vie
 
 	mat4 view_matrix;
 	wxrc_xr_view_get_matrix(xr_view, view_matrix);
+	glm_mat4_inv(view_matrix, view_matrix);
 
 	mat4 projection_matrix;
 	wxrc_xr_projection_from_fov(&xr_view->fov, 0.05, 100.0, projection_matrix);

@@ -237,6 +237,7 @@ static void output_handle_frame(struct wl_listener *listener, void *data) {
 
 	mat4 view_matrix;
 	wxrc_xr_view_get_matrix(&server->xr_views[0], view_matrix);
+	glm_mat4_inv(view_matrix, view_matrix);
 
 	mat4 projection_matrix;
 	glm_perspective_default((float)width / height, projection_matrix);
