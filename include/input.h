@@ -7,6 +7,11 @@
 
 struct wxrc_server;
 
+enum wxrc_seatop {
+	WXRC_SEATOP_DEFAULT,
+	WXRC_SEATOP_MOVE,
+};
+
 struct wxrc_keyboard {
 	struct wl_list link;
 	struct wxrc_server *server;

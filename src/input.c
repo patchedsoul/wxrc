@@ -96,6 +96,11 @@ static bool handle_keybinding(struct wxrc_server *server, xkb_keysym_t sym) {
 	return true;
 }
 
+static bool keyboard_meta_pressed(struct wxrc_keyboard *keyboard) {
+	uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard->device->keyboard);
+	return modifiers & WLR_MODIFIER_ALT;
+}
+
 static void keyboard_handle_key(
 		struct wl_listener *listener, void *data) {
 	struct wxrc_keyboard *keyboard =
@@ -111,8 +116,7 @@ static void keyboard_handle_key(
 
 	/* TODO: In the future we'll likely want a more sophisticated approach */
 	bool handled = false;
-	uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard->device->keyboard);
-	if ((modifiers & WLR_MODIFIER_ALT) && event->state == WLR_KEY_PRESSED) {
+	if (keyboard_meta_pressed(keyboard) && event->state == WLR_KEY_PRESSED) {
 		for (int i = 0; i < nsyms; i++) {
 			handled = handle_keybinding(server, syms[i]);
 		}
@@ -153,7 +157,7 @@ void handle_new_keyboard(struct wxrc_server *server,
 	wl_list_insert(&server->keyboards, &keyboard->link);
 }
 
-void wxrc_update_pointer(struct wxrc_server *server, XrView *xr_view,
+static void update_pointer_default(struct wxrc_server *server, XrView *xr_view,
 		uint32_t time) {
 	versor orientation;
 	vec3 position;
@@ -218,6 +222,41 @@ void wxrc_update_pointer(struct wxrc_server *server, XrView *xr_view,
 	}
 }
 
+static void update_pointer_move(struct wxrc_server *server, XrView *xr_view) {
+	wlr_seat_pointer_clear_focus(server->seat);
+
+	struct wxrc_view *view = wxrc_get_focus(server);
+	if (view == NULL) {
+		return;
+	}
+
+	mat4 view_matrix;
+	wxrc_xr_view_get_matrix(xr_view, view_matrix);
+	wxrc_mat4_rotate(view_matrix, server->pointer_rotation);
+
+	vec3 pos = { 0.0, 0.0, -2.0 };
+	glm_vec3_rotate_m4(view_matrix, pos, pos);
+
+	vec3 rot;
+	glm_euler_angles(view_matrix, rot);
+
+	glm_vec3_copy(pos, view->position);
+	glm_vec3_copy(rot, view->rotation);
+}
+
+void wxrc_update_pointer(struct wxrc_server *server, XrView *xr_view,
+		uint32_t time) {
+	switch (server->seatop) {
+	case WXRC_SEATOP_DEFAULT:
+		update_pointer_default(server, xr_view, time);
+		return;
+	case WXRC_SEATOP_MOVE:
+		update_pointer_move(server, xr_view);
+		return;
+	}
+	abort();
+}
+
 static void clamp(float *f, float min, float max) {
 	if (*f < min) {
 		*f = min;
@@ -248,6 +287,21 @@ static void pointer_handle_motion(struct wl_listener *listener, void *data) {
 static void pointer_handle_button(struct wl_listener *listener, void *data) {
 	struct wxrc_pointer *pointer = wl_container_of(listener, pointer, button);
 	struct wlr_event_pointer_button *event = data;
+
+	bool meta_pressed = false;
+	struct wxrc_keyboard *keyboard;
+	wl_list_for_each(keyboard, &pointer->server->keyboards, link) {
+		if (keyboard_meta_pressed(keyboard)) {
+			meta_pressed = true;
+			break;
+		}
+	}
+
+	if (meta_pressed) {
+		pointer->server->seatop = (event->state == WLR_BUTTON_PRESSED) ?
+			WXRC_SEATOP_MOVE : WXRC_SEATOP_DEFAULT;
+		return;
+	}
 
 	wlr_seat_pointer_notify_button(pointer->server->seat,
 		event->time_msec, event->button, event->state);

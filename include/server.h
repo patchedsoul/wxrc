@@ -8,6 +8,7 @@
 #include <wlr/render/wlr_texture.h>
 #include <wlr/types/wlr_xcursor_manager.h>
 #include <wlr/types/wlr_xdg_shell.h>
+#include "input.h"
 #include "render.h"
 
 struct wxrc_xr_backend;
@@ -36,6 +37,7 @@ struct wxrc_server {
 	struct wlr_texture *cursor;
 	vec3 pointer_rotation; /* relative to the first XR view's orientation */
 	mat4 cursor_matrix;
+	enum wxrc_seatop seatop;
 
 	struct wl_list keyboards;
 	struct wl_list pointers;

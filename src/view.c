@@ -42,6 +42,6 @@ struct wxrc_view *wxrc_get_focus(struct wxrc_server *server) {
 	if (wl_list_empty(&server->views)) {
 		return NULL;
 	}
-	struct wxrc_view *view = wl_container_of(server->views.prev, view, link);
+	struct wxrc_view *view = wl_container_of(server->views.next, view, link);
 	return view;
 }
