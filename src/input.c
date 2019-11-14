@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <wlr/types/wlr_input_device.h>
@@ -174,6 +175,7 @@ static struct wxrc_view *view_at(struct wxrc_server *server, XrView *xr_view,
 	glm_vec3_rotate_m4(pointer_rot_matrix, dir, dir);
 
 	struct wlr_surface *focus = NULL;
+	struct wxrc_view *focus_view = NULL;
 	float focus_dist = FLT_MAX;
 	vec3 cursor_pos;
 	vec3 cursor_rot;
@@ -202,6 +204,7 @@ static struct wxrc_view *view_at(struct wxrc_server *server, XrView *xr_view,
 		// Add an epsilon to dist to avoid Z-index rounding errors fighting
 		if (dist + 0.01 < focus_dist) {
 			focus = view->surface;
+			focus_view = view;
 			focus_sx = sx;
 			focus_sy = sy;
 			focus_dist = dist;
@@ -214,15 +217,20 @@ static struct wxrc_view *view_at(struct wxrc_server *server, XrView *xr_view,
 		return NULL;
 	}
 
-	*surface_ptr = focus;
-	*sx_ptr = focus_sx;
-	*sy_ptr = focus_sy;
+	if (surface_ptr != NULL) {
+		*surface_ptr = focus;
+	}
+	if (sx_ptr != NULL || sy_ptr != NULL) {
+		assert(sx_ptr != NULL && sy_ptr != NULL);
+		*sx_ptr = focus_sx;
+		*sy_ptr = focus_sy;
+	}
 
 	glm_mat4_identity(cursor_matrix);
 	glm_translate(cursor_matrix, cursor_pos);
 	wxrc_mat4_rotate(cursor_matrix, cursor_rot);
 
-	return view;
+	return focus_view;
 }
 
 static void update_pointer_default(struct wxrc_server *server, XrView *xr_view,
@@ -304,11 +312,21 @@ static void pointer_handle_motion(struct wl_listener *listener, void *data) {
 
 static void pointer_handle_button(struct wl_listener *listener, void *data) {
 	struct wxrc_pointer *pointer = wl_container_of(listener, pointer, button);
+	struct wxrc_server *server = pointer->server;
 	struct wlr_event_pointer_button *event = data;
+
+	if (event->state == WLR_BUTTON_PRESSED) {
+		mat4 cursor_matrix;
+		struct wxrc_view *view = view_at(server, &server->xr_views[0],
+			cursor_matrix, NULL, NULL, NULL);
+		if (view != NULL) {
+			focus_view(view);
+		}
+	}
 
 	bool meta_pressed = false;
 	struct wxrc_keyboard *keyboard;
-	wl_list_for_each(keyboard, &pointer->server->keyboards, link) {
+	wl_list_for_each(keyboard, &server->keyboards, link) {
 		if (keyboard_meta_pressed(keyboard)) {
 			meta_pressed = true;
 			break;
@@ -316,12 +334,12 @@ static void pointer_handle_button(struct wl_listener *listener, void *data) {
 	}
 
 	if (meta_pressed) {
-		pointer->server->seatop = (event->state == WLR_BUTTON_PRESSED) ?
+		server->seatop = (event->state == WLR_BUTTON_PRESSED) ?
 			WXRC_SEATOP_MOVE : WXRC_SEATOP_DEFAULT;
 		return;
 	}
 
-	wlr_seat_pointer_notify_button(pointer->server->seat,
+	wlr_seat_pointer_notify_button(server->seat,
 		event->time_msec, event->button, event->state);
 }
 
