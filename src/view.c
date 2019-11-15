@@ -118,3 +118,12 @@ void wxrc_view_for_each_surface(struct wxrc_view *view,
 		iterator(view->surface, 0, 0, user_data);
 	}
 }
+
+struct wlr_surface *wxrc_view_surface_at(struct wxrc_view *view,
+		double sx, double sy, double *child_sx, double *child_sy) {
+	if (view->impl->surface_at) {
+		return view->impl->surface_at(view, sx, sy, child_sx, child_sy);
+	} else {
+		return wlr_surface_surface_at(view->surface, sx, sy, child_sx, child_sy);
+	}
+}

@@ -18,6 +18,8 @@ struct wxrc_view;
 struct wxrc_view_interface {
 	void (*for_each_surface)(struct wxrc_view *view,
 		wlr_surface_iterator_func_t iterator, void *user_data);
+	struct wlr_surface *(*surface_at)(struct wxrc_view *view,
+		double sx, double sy, double *child_sx, double *child_sy);
 	void (*set_activated)(struct wxrc_view *view, bool activated);
 	void (*close)(struct wxrc_view *view);
 };
@@ -59,5 +61,7 @@ void wxrc_view_begin_move(struct wxrc_view *view);
 void wxrc_view_close(struct wxrc_view *view);
 void wxrc_view_for_each_surface(struct wxrc_view *view,
 	wlr_surface_iterator_func_t iterator, void *user_data);
+struct wlr_surface *wxrc_view_surface_at(struct wxrc_view *view,
+	double sx, double sy, double *child_sx, double *child_sy);
 
 #endif

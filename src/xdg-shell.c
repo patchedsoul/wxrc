@@ -23,6 +23,13 @@ static void for_each_surface(struct wxrc_view *view,
 		iterator, user_data);
 }
 
+static struct wlr_surface *surface_at(struct wxrc_view *view,
+		double sx, double sy, double *child_sx, double *child_sy) {
+	struct wxrc_xdg_shell_view *xdg_view = xdg_shell_view_from_view(view);
+	return wlr_xdg_surface_surface_at(xdg_view->xdg_surface, sx, sy,
+		child_sx, child_sy);
+}
+
 static void set_activated(struct wxrc_view *view, bool activated) {
 	struct wxrc_xdg_shell_view *xdg_view = xdg_shell_view_from_view(view);
 	wlr_xdg_toplevel_set_activated(xdg_view->xdg_surface, activated);
@@ -35,6 +42,7 @@ static void close(struct wxrc_view *view) {
 
 static const struct wxrc_view_interface xdg_shell_view_impl = {
 	.for_each_surface = for_each_surface,
+	.surface_at = surface_at,
 	.set_activated = set_activated,
 	.close = close,
 };

@@ -161,22 +161,26 @@ static struct wxrc_view *view_at(struct wxrc_server *server, XrView *xr_view,
 
 		vec3 intersection;
 		float sx, sy;
-		if (!wxrc_intersect_surface_line(view->surface, model_matrix, view->position,
-				view->rotation, position, dir, intersection, &sx, &sy)) {
+		if (!wxrc_intersect_surface_plane_line(view->surface, model_matrix,
+				view->position, view->rotation, position, dir, intersection,
+				&sx, &sy)) {
 			continue;
 		}
 
-		if (!wlr_surface_point_accepts_input(view->surface, sx, sy)) {
+		double child_sx, child_sy;
+		struct wlr_surface *surface = wxrc_view_surface_at(view, sx, sy,
+			&child_sx, &child_sy);
+		if (surface == NULL) {
 			continue;
 		}
 
 		float dist = glm_vec3_distance(position, intersection);
 		// Add an epsilon to dist to avoid Z-index rounding errors fighting
 		if (dist + 0.01 < focus_dist) {
-			focus = view->surface;
+			focus = surface;
 			focus_view = view;
-			focus_sx = sx;
-			focus_sy = sy;
+			focus_sx = child_sx;
+			focus_sy = child_sy;
 			focus_dist = dist;
 			glm_vec3_copy(intersection, cursor_pos);
 			glm_vec3_copy(view->rotation, cursor_rot);

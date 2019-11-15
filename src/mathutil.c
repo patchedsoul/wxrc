@@ -38,9 +38,10 @@ static void vec3_rotate(vec3 angles, vec3 vec) {
 	glm_vec3_rotate_m4(m, vec, vec);
 }
 
-bool wxrc_intersect_surface_line(struct wlr_surface *surface, mat4 model_matrix,
-		vec3 surface_position, vec3 surface_rotation, vec3 line_position,
-		vec3 line_dir, vec3 intersection, float *sx_ptr, float *sy_ptr) {
+bool wxrc_intersect_surface_plane_line(struct wlr_surface *surface,
+		mat4 model_matrix, vec3 surface_position, vec3 surface_rotation,
+		vec3 line_position, vec3 line_dir, vec3 intersection,
+		float *sx_ptr, float *sy_ptr) {
 	vec3 surface_normal = { 0.0, 0.0, -1.0 };
 	vec3_rotate(surface_rotation, surface_normal);
 
@@ -61,11 +62,7 @@ bool wxrc_intersect_surface_line(struct wlr_surface *surface, mat4 model_matrix,
 	float sx = pos[0] * width;
 	float sy = (1.0 - pos[1]) * height;
 
-	if (sx >= 0 && sy >= 0 && sx < width && sy < height) {
-		*sx_ptr = sx;
-		*sy_ptr = sy;
-		return true;
-	} else {
-		return false;
-	}
+	*sx_ptr = sx;
+	*sy_ptr = sy;
+	return true;
 }
