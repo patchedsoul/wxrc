@@ -46,6 +46,44 @@ struct wxrc_view *wxrc_get_focus(struct wxrc_server *server) {
 	return view;
 }
 
+void wxrc_set_focus(struct wxrc_view *view) {
+	if (view == NULL) {
+		return;
+	}
+	struct wlr_surface *surface = view->surface;
+
+	struct wxrc_server *server = view->server;
+	struct wlr_seat *seat = server->seat;
+	struct wlr_surface *prev_surface = seat->keyboard_state.focused_surface;
+	if (prev_surface == surface) {
+		return;
+	}
+	if (prev_surface) {
+		struct wlr_xdg_surface *previous = wlr_xdg_surface_from_wlr_surface(
+			seat->keyboard_state.focused_surface);
+		if (previous) {
+			wlr_xdg_toplevel_set_activated(previous, false);
+		}
+	}
+	struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(seat);
+	wl_list_remove(&view->link);
+	wl_list_insert(&server->views, &view->link);
+
+	wlr_seat_keyboard_notify_enter(seat, surface,
+		keyboard->keycodes, keyboard->num_keycodes,
+		&keyboard->modifiers);
+
+	switch (view->view_type) {
+	case WXRC_VIEW_XDG_SHELL:;
+		struct wxrc_xdg_shell_view *xdg_view =
+			(struct wxrc_xdg_shell_view *)view;
+		wlr_xdg_toplevel_set_activated(xdg_view->xdg_surface, true);
+		break;
+	case WXRC_VIEW_XWAYLAND:
+		break; // TODO
+	}
+}
+
 void wxrc_view_begin_move(struct wxrc_view *view) {
 	struct wxrc_server *server = view->server;
 	if (wxrc_get_focus(server) != view ||

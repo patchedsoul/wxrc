@@ -11,42 +11,6 @@
 #include "view.h"
 #include "xrutil.h"
 
-void focus_view(struct wxrc_view *view) {
-	if (view == NULL) {
-		return;
-	}
-	struct wlr_surface *surface = view->surface;
-
-	struct wxrc_server *server = view->server;
-	struct wlr_seat *seat = server->seat;
-	struct wlr_surface *prev_surface = seat->keyboard_state.focused_surface;
-	if (prev_surface == surface) {
-		return;
-	}
-	if (prev_surface) {
-		struct wlr_xdg_surface *previous = wlr_xdg_surface_from_wlr_surface(
-					seat->keyboard_state.focused_surface);
-		if (previous) {
-			wlr_xdg_toplevel_set_activated(previous, false);
-		}
-	}
-	struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(seat);
-	wl_list_remove(&view->link);
-	wl_list_insert(&server->views, &view->link);
-	switch (view->view_type) {
-	case WXRC_VIEW_XDG_SHELL:;
-		struct wxrc_xdg_shell_view *xdg_view =
-			(struct wxrc_xdg_shell_view *)view;
-		wlr_xdg_toplevel_set_activated(xdg_view->xdg_surface, true);
-		wlr_seat_keyboard_notify_enter(seat, surface,
-				keyboard->keycodes, keyboard->num_keycodes,
-				&keyboard->modifiers);
-		break;
-	default:
-		break;
-	}
-}
-
 static void keyboard_handle_modifiers(
 		struct wl_listener *listener, void *data) {
 	struct wxrc_keyboard *keyboard =
@@ -84,7 +48,7 @@ static bool handle_keybinding(struct wxrc_server *server, xkb_keysym_t sym) {
 			server->views.next, current_view, link);
 		struct wxrc_view *next_view = wl_container_of(
 			current_view->link.next, next_view, link);
-		focus_view(next_view);
+		wxrc_set_focus(next_view);
 		wl_list_remove(&current_view->link);
 		wl_list_insert(server->views.prev, &current_view->link);
 		break;
@@ -329,7 +293,7 @@ static void pointer_handle_button(struct wl_listener *listener, void *data) {
 		if (view == NULL) {
 			break;
 		}
-		focus_view(view);
+		wxrc_set_focus(view);
 
 		bool meta_pressed = false;
 		struct wxrc_keyboard *keyboard;

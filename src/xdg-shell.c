@@ -27,7 +27,7 @@ static void handle_xdg_surface_map(struct wl_listener *listener, void *data) {
 	wlr_log(WLR_DEBUG, "Spawning view at <%f,%f,%f>",
 			pos[0], pos[1], pos[2]);
 
-	focus_view(&view->base);
+	wxrc_set_focus(&view->base);
 	view->base.mapped = true;
 }
 
@@ -38,7 +38,7 @@ static void handle_xdg_surface_unmap(struct wl_listener *listener, void *data) {
 	struct wxrc_view *wview;
 	wl_list_for_each(wview, &view->base.server->views, link) {
 		if (wview->mapped) {
-			focus_view(wview);
+			wxrc_set_focus(wview);
 			break;
 		}
 	}
