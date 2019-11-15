@@ -294,27 +294,60 @@ static void render_texture(struct wxrc_gl *gl, struct wlr_texture *tex,
 	glUseProgram(0);
 }
 
-static void render_view(struct wxrc_gl *gl,
-		mat4 vp_matrix, struct wxrc_view *view) {
-	/* TODO: Iterate over surface tree */
-	struct wlr_surface *surface = view->surface;
+struct render_data {
+	struct wxrc_gl *gl;
+	struct wxrc_view *view;
+	mat4 vp_matrix;
+};
 
-	struct wlr_buffer *buffer = surface->buffer;
-	if (buffer == NULL) {
+static void render_surface_iterator(struct wlr_surface *surface,
+		int sx, int sy, void *_data) {
+	struct render_data *data = _data;
+
+	if (surface->buffer == NULL || surface->buffer->texture == NULL) {
 		return;
 	}
-	struct wlr_texture *tex = buffer->texture;
-	if (tex == NULL) {
-		return;
-	}
+
+	int root_width = data->view->surface->current.buffer_width;
+	int root_height = data->view->surface->current.buffer_height;
+
+	int width = surface->current.buffer_width;
+	int height = surface->current.buffer_height;
 
 	mat4 model_matrix;
-	wxrc_view_get_2d_model_matrix(view, model_matrix);
+	wxrc_view_get_model_matrix(data->view, model_matrix);
 
-	mat4 mvp_matrix = GLM_MAT4_IDENTITY_INIT;
-	glm_mat4_mul(vp_matrix, model_matrix, mvp_matrix);
+	/* Transform into world coordinates */
+	float scale = 1.0 / WXRC_SURFACE_SCALE;
+	glm_scale(model_matrix, (vec3){ scale, -scale, 1.0 });
 
-	render_texture(gl, tex, mvp_matrix);
+	glm_translate(model_matrix, (vec3){
+		sx -(float)root_width/2.0 + (float)width/2.0,
+		sy -(float)root_height/2.0 + (float)height/2.0,
+		0.0,
+	});
+
+	/* Transform into surface-local coordinates */
+	glm_scale(model_matrix, (vec3){ width, -height, 1.0 });
+
+	/* Re-origin the view to the center */
+	glm_translate(model_matrix, (vec3){ -0.5, -0.5, 0.0 });
+
+	mat4 mvp_matrix;
+	glm_mat4_mul(data->vp_matrix, model_matrix, mvp_matrix);
+
+	render_texture(data->gl, surface->buffer->texture, mvp_matrix);
+}
+
+static void render_view(struct wxrc_gl *gl,
+		mat4 vp_matrix, struct wxrc_view *view) {
+	struct render_data data = {
+		.gl = gl,
+		.view = view,
+	};
+	glm_mat4_copy(vp_matrix, data.vp_matrix);
+
+	wxrc_view_for_each_surface(view, render_surface_iterator, &data);
 }
 
 static void render_cursor(struct wxrc_server *server,
