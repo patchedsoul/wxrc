@@ -91,8 +91,8 @@ static void handle_new_xdg_surface(struct wl_listener *listener, void *data) {
 
 	struct wxrc_xdg_shell_view *view =
 		calloc(1, sizeof(struct wxrc_xdg_shell_view));
-	wxrc_view_init(&view->base, server, WXRC_VIEW_XDG_SHELL,
-		&xdg_shell_view_impl, xdg_surface->surface);
+	wxrc_view_init(&view->base, server, &xdg_shell_view_impl,
+		xdg_surface->surface);
 	view->xdg_surface = xdg_surface;
 
 	view->map.notify = handle_xdg_surface_map;

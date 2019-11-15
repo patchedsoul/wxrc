@@ -4,10 +4,8 @@
 #include "view.h"
 
 void wxrc_view_init(struct wxrc_view *view, struct wxrc_server *server,
-		enum wxrc_view_type type, const struct wxrc_view_interface *impl,
-		struct wlr_surface *surface) {
+		const struct wxrc_view_interface *impl, struct wlr_surface *surface) {
 	view->server = server;
-	view->view_type = type;
 	view->impl = impl;
 	view->surface = surface;
 
