@@ -93,3 +93,12 @@ void wxrc_view_close(struct wxrc_view *view) {
 		view->impl->close(view);
 	}
 }
+
+void wxrc_view_for_each_surface(struct wxrc_view *view,
+		wlr_surface_iterator_func_t iterator, void *user_data) {
+	if (view->impl->for_each_surface) {
+		view->impl->for_each_surface(view, iterator, user_data);
+	} else {
+		iterator(view->surface, 0, 0, user_data);
+	}
+}

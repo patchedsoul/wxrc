@@ -319,6 +319,12 @@ static void backend_iterator(struct wlr_backend *backend, void *data) {
 	wl_display_roundtrip(remote_display);
 }
 
+static void send_frame_done_iterator(struct wlr_surface *surface,
+		int sx, int sy, void *data) {
+	struct timespec *t = data;
+	wlr_surface_send_frame_done(surface, t);
+}
+
 int main(int argc, char *argv[]) {
 	struct wxrc_server server = {0};
 
@@ -470,7 +476,7 @@ int main(int argc, char *argv[]) {
 
 		struct wxrc_view *view;
 		wl_list_for_each(view, &server.views, link) {
-			wlr_surface_send_frame_done(view->surface, &now);
+			wxrc_view_for_each_surface(view, send_frame_done_iterator, &now);
 		}
 	}
 
