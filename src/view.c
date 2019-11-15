@@ -4,12 +4,14 @@
 #include "view.h"
 
 void wxrc_view_init(struct wxrc_view *view, struct wxrc_server *server,
-		enum wxrc_view_type type, struct wlr_surface *surface) {
+		enum wxrc_view_type type, const struct wxrc_view_interface *impl,
+		struct wlr_surface *surface) {
 	view->server = server;
 	view->view_type = type;
+	view->impl = impl;
 	view->surface = surface;
 
-	wl_list_insert(&server->views, &view->link);
+	wl_list_insert(server->views.prev, &view->link);
 }
 
 void wxrc_view_finish(struct wxrc_view *view) {
@@ -43,6 +45,9 @@ struct wxrc_view *wxrc_get_focus(struct wxrc_server *server) {
 		return NULL;
 	}
 	struct wxrc_view *view = wl_container_of(server->views.next, view, link);
+	if (!view->mapped) {
+		return NULL;
+	}
 	return view;
 }
 
@@ -50,37 +55,28 @@ void wxrc_set_focus(struct wxrc_view *view) {
 	if (view == NULL) {
 		return;
 	}
-	struct wlr_surface *surface = view->surface;
 
 	struct wxrc_server *server = view->server;
-	struct wlr_seat *seat = server->seat;
-	struct wlr_surface *prev_surface = seat->keyboard_state.focused_surface;
-	if (prev_surface == surface) {
+
+	struct wxrc_view *prev_view = wxrc_get_focus(server);
+	if (prev_view == view) {
 		return;
 	}
-	if (prev_surface) {
-		struct wlr_xdg_surface *previous = wlr_xdg_surface_from_wlr_surface(
-			seat->keyboard_state.focused_surface);
-		if (previous) {
-			wlr_xdg_toplevel_set_activated(previous, false);
-		}
+	if (prev_view != NULL && prev_view->impl->set_activated) {
+		prev_view->impl->set_activated(prev_view, false);
 	}
-	struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(seat);
+
 	wl_list_remove(&view->link);
 	wl_list_insert(&server->views, &view->link);
 
-	wlr_seat_keyboard_notify_enter(seat, surface,
+	struct wlr_seat *seat = server->seat;
+	struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(seat);
+	wlr_seat_keyboard_notify_enter(seat, view->surface,
 		keyboard->keycodes, keyboard->num_keycodes,
 		&keyboard->modifiers);
 
-	switch (view->view_type) {
-	case WXRC_VIEW_XDG_SHELL:;
-		struct wxrc_xdg_shell_view *xdg_view =
-			(struct wxrc_xdg_shell_view *)view;
-		wlr_xdg_toplevel_set_activated(xdg_view->xdg_surface, true);
-		break;
-	case WXRC_VIEW_XWAYLAND:
-		break; // TODO
+	if (view->impl->set_activated) {
+		view->impl->set_activated(view, true);
 	}
 }
 
@@ -95,13 +91,7 @@ void wxrc_view_begin_move(struct wxrc_view *view) {
 }
 
 void wxrc_view_close(struct wxrc_view *view) {
-	switch (view->view_type) {
-	case WXRC_VIEW_XDG_SHELL:;
-		struct wxrc_xdg_shell_view *xdg_view =
-			(struct wxrc_xdg_shell_view *)view;
-		wlr_xdg_toplevel_send_close(xdg_view->xdg_surface);
-		break;
-	case WXRC_VIEW_XWAYLAND:
-		break; // TODO
+	if (view->impl->close) {
+		view->impl->close(view);
 	}
 }
