@@ -91,6 +91,12 @@ static bool handle_keybinding(struct wxrc_server *server, xkb_keysym_t sym) {
 	case XKB_KEY_Return:
 		spawn_terminal();
 		break;
+	case XKB_KEY_q:;
+		struct wxrc_view *view = wxrc_get_focus(server);
+		if (view != NULL) {
+			wxrc_view_close(view);
+		}
+		break;
 	default:
 		return false;
 	}

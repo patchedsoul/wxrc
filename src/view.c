@@ -55,3 +55,15 @@ void wxrc_view_begin_move(struct wxrc_view *view) {
 	wlr_seat_pointer_clear_focus(server->seat);
 	server->seatop = WXRC_SEATOP_MOVE;
 }
+
+void wxrc_view_close(struct wxrc_view *view) {
+	switch (view->view_type) {
+	case WXRC_VIEW_XDG_SHELL:;
+		struct wxrc_xdg_shell_view *xdg_view =
+			(struct wxrc_xdg_shell_view *)view;
+		wlr_xdg_toplevel_send_close(xdg_view->xdg_surface);
+		break;
+	case WXRC_VIEW_XWAYLAND:
+		break; // TODO
+	}
+}
