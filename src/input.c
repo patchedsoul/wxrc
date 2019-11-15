@@ -157,7 +157,7 @@ static struct wxrc_view *view_at(struct wxrc_server *server, XrView *xr_view,
 		}
 
 		mat4 model_matrix;
-		wxrc_view_get_2d_model_matrix(view, model_matrix);
+		wxrc_view_get_2d_model_matrix(view, NULL, 0, 0, model_matrix);
 
 		vec3 intersection;
 		float sx, sy;

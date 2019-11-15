@@ -308,30 +308,8 @@ static void render_surface_iterator(struct wlr_surface *surface,
 		return;
 	}
 
-	int root_width = data->view->surface->current.buffer_width;
-	int root_height = data->view->surface->current.buffer_height;
-
-	int width = surface->current.buffer_width;
-	int height = surface->current.buffer_height;
-
 	mat4 model_matrix;
-	wxrc_view_get_model_matrix(data->view, model_matrix);
-
-	/* Transform into world coordinates */
-	float scale = 1.0 / WXRC_SURFACE_SCALE;
-	glm_scale(model_matrix, (vec3){ scale, -scale, 1.0 });
-
-	glm_translate(model_matrix, (vec3){
-		sx -(float)root_width/2.0 + (float)width/2.0,
-		sy -(float)root_height/2.0 + (float)height/2.0,
-		0.0,
-	});
-
-	/* Transform into surface-local coordinates */
-	glm_scale(model_matrix, (vec3){ width, -height, 1.0 });
-
-	/* Re-origin the view to the center */
-	glm_translate(model_matrix, (vec3){ -0.5, -0.5, 0.0 });
+	wxrc_view_get_2d_model_matrix(data->view, surface, sx, sy, model_matrix);
 
 	mat4 mvp_matrix;
 	glm_mat4_mul(data->vp_matrix, model_matrix, mvp_matrix);

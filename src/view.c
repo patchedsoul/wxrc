@@ -23,16 +23,32 @@ void wxrc_view_get_model_matrix(struct wxrc_view *view, mat4 model_matrix) {
 	wxrc_mat4_rotate(model_matrix, view->rotation);
 }
 
-void wxrc_view_get_2d_model_matrix(struct wxrc_view *view, mat4 model_matrix) {
-	int width = view->surface->current.buffer_width;
-	int height = view->surface->current.buffer_height;
+void wxrc_view_get_2d_model_matrix(struct wxrc_view *view,
+		struct wlr_surface *surface, int sx, int sy, mat4 model_matrix) {
+	if (surface == NULL) {
+		surface = view->surface;
+	}
 
-	float scale_x = width / WXRC_SURFACE_SCALE;
-	float scale_y = height / WXRC_SURFACE_SCALE;
+	int root_width = view->surface->current.buffer_width;
+	int root_height = view->surface->current.buffer_height;
+
+	int width = surface->current.buffer_width;
+	int height = surface->current.buffer_height;
 
 	wxrc_view_get_model_matrix(view, model_matrix);
 
-	glm_scale(model_matrix, (vec3){ scale_x, scale_y, 1.0 });
+	/* Transform into world coordinates */
+	float scale = 1.0 / WXRC_SURFACE_SCALE;
+	glm_scale(model_matrix, (vec3){ scale, -scale, 1.0 });
+
+	glm_translate(model_matrix, (vec3){
+		sx -(float)root_width/2.0 + (float)width/2.0,
+		sy -(float)root_height/2.0 + (float)height/2.0,
+		0.0,
+	});
+
+	/* Transform into surface-local coordinates */
+	glm_scale(model_matrix, (vec3){ width, -height, 1.0 });
 
 	/* Re-origin the view to the center */
 	glm_translate(model_matrix, (vec3){ -0.5, -0.5, 0.0 });

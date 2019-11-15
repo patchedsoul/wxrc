@@ -51,7 +51,8 @@ void wxrc_view_init(struct wxrc_view *view, struct wxrc_server *server,
 	const struct wxrc_view_interface *impl, struct wlr_surface *surface);
 void wxrc_view_finish(struct wxrc_view *view);
 void wxrc_view_get_model_matrix(struct wxrc_view *view, mat4 matrix);
-void wxrc_view_get_2d_model_matrix(struct wxrc_view *view, mat4 model_matrix);
+void wxrc_view_get_2d_model_matrix(struct wxrc_view *view,
+	struct wlr_surface *surface, int sx, int sy, mat4 model_matrix);
 struct wxrc_view *wxrc_get_focus(struct wxrc_server *server);
 void wxrc_set_focus(struct wxrc_view *view);
 void wxrc_view_begin_move(struct wxrc_view *view);
