@@ -17,3 +17,9 @@ executable('cube',
 	dependencies: client_deps,
 	install: true,
 )
+
+executable('fractal',
+	files('fractal.c'),
+	dependencies: client_deps,
+	install: true,
+)
