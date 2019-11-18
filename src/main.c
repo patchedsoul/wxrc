@@ -12,7 +12,9 @@
 #include <wlr/backend.h>
 #include <wlr/backend/multi.h>
 #include <wlr/backend/wayland.h>
+#include <wlr/types/wlr_data_control_v1.h>
 #include <wlr/types/wlr_data_device.h>
+#include <wlr/types/wlr_primary_selection_v1.h>
 #include <wlr/types/wlr_seat.h>
 #include <wlr/render/egl.h>
 #include <wlr/util/log.h>
@@ -410,6 +412,8 @@ int main(int argc, char *argv[]) {
 
 	wlr_compositor_create(server.wl_display, renderer);
 	wlr_data_device_manager_create(server.wl_display);
+	wlr_data_control_manager_v1_create(server.wl_display);
+	wlr_primary_selection_v1_device_manager_create(server.wl_display);
 
 	wxrc_input_init(&server);
 
