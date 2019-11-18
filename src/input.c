@@ -152,7 +152,7 @@ static struct wxrc_view *view_at(struct wxrc_server *server, XrView *xr_view,
 	float focus_sx, focus_sy;
 	struct wxrc_view *view;
 	wl_list_for_each(view, &server->views, link) {
-		if (!view->mapped) {
+		if (!view->mapped || wxrc_view_is_xr_shell(view)) {
 			continue;
 		}
 

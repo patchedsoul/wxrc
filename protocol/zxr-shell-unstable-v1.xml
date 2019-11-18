@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="xr_shell_unstable_v1">
+  <copyright>
+    Copyright © 2019 Status Research &amp; Development GmbH.
+
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the "Software"),
+    to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense,
+    and/or sell copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice (including the next
+    paragraph) shall be included in all copies or substantial portions of the
+    Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+    THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
+  </copyright>
+
+  <description summary="an extended reality (XR) shell">
+    TODO: Describe overall protocol here
+
+    Warning! The protocol described in this file is experimental and
+    backward incompatible changes may be made. Backward compatible changes
+    may be added together with the corresponding interface version bump.
+    Backward incompatible changes are done by bumping the version number in
+    the protocol and interface names and resetting the interface version.
+    Once the protocol is to be declared stable, the 'z' prefix and the
+    version number in the protocol and interface names are removed and the
+    interface version number is reset.
+  </description>
+
+  <interface name="zxr_view_v1" version="1">
+    <description summary="a perspective from which the scene is viewed">
+      zxr_view_v1 represents a perspective from which the scene is shown, for
+      example from each eye of a head-mounted device (HMD).
+
+      For wl_buffer types which submit multiple buffers, the client must prepare
+      a buffer for every view global. If they fail to do so, the compositor may
+      skip rendering the affected surface. If a view global is removed and the
+      client
+    </description>
+
+    <!-- TODO: Resolution event (and subpixel?) -->
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy zxr_view_v1">
+        Sent when the client will no longer use this XR view.
+      </description>
+    </request>
+  </interface>
+
+  <interface name="zxr_shell_v1" version="1">
+    <request name="create_composite_buffer">
+      <description summary="create a composite buffer">
+        Creates a new zxr_composite_buffer_v1. See the documentation for its
+        interface for details.
+      </description>
+      <arg name="id" type="new_id" interface="zxr_composite_buffer_v1" />
+    </request>
+
+    <request name="get_xr_surface">
+      <description summary="create xr surface from a surface">
+        This request creates a zxr_surface_v1 for the given surface. This
+        assigns the xr_surface role to the surface.
+
+        See the documentation for zxr_surface_v1 for more details on how the
+        interface is used.
+      </description>
+      <arg name="id" type="new_id" interface="zxr_surface_v1"/>
+      <arg name="surface" type="object" interface="wl_surface"/>
+    </request>
+  </interface>
+
+  <interface name="zxr_surface_v1" version="1">
+    <description summary="a surface which is shown in a 3D scene">
+      An XR surface represents a surface which is shown in a 3D scene. In order
+      for the surface to be presented, the client must obtain an
+      zxr_surface_view_v1 for each zxr_view_v1 global currently in use by the
+      compositor, and submit a buffer which contains enough information to
+      present the surface on each view. The actual usage requirements for these
+      surface-views varies between different kinds of 3D buffers, but the client
+      is required to create a surface-view for all active XR views regardless.
+
+      If a client fails to provide surface-views for all XR views currently in
+      use, the compositor may present a placeholder object, skip rendering the
+      surface, or another behavior of their choosing, for one or more of the
+      affected views. It is recommended that the compositor does not draw a
+      surface for which left and right eye buffers are not available for the
+      same HMD. A client which submits frames too slowly may be subject to
+      similar treatment. In an XR environment, latency can result in physical
+      sickness to the user, therefore it's very important to prepare new frames
+      quickly.
+
+      The surface-local coordinate space of an XR surface is defined by the
+      attached buffer interface.
+
+      It is a protocol error to attach a 2D buffer to an XR surface.
+    </description>
+
+    <enum name="error">
+      <entry name="invalid_buffer" value="0"
+        summary="client attempted to attach a 2D buffer to this surface" />
+    </enum>
+
+    <request name="get_surface_view">
+      <description summary="get a surface-view for the given xr view">
+        Creates a zxr_surface_view for this surface. Clients must create a
+        surface-view for every zxr_view_v1 advertised by the compositor.
+      </description>
+      <arg name="surface_view" type="new_id" interface="zxr_surface_view_v1" />
+      <arg name="view" type="object" interface="zxr_view_v1" />
+    </request>
+  </interface>
+
+  <interface name="zxr_surface_view_v1" version="1">
+    <event name="mvp_matrix">
+      <description summary="update the model-view-projection matrix">
+        The server sends this event to update the model-view-projection matrix
+        for this surface-view's perspective. The client should prepare its next
+        frame using this matrix.
+        <!-- TODO: Explain what a model view projection matrix is? -->
+      </description>
+      <arg name="mvp_matrix" type="array"
+        summary="4x4 matrix of 32-bit IEEE floating point numbers in row-major order" />
+    </event>
+  </interface>
+
+  <interface name="zxr_composite_buffer_v1" version="1">
+    <description summary="a buffer containing one 2D buffer for each XR view">
+      An XR composite buffer consists of several 2D buffers, one for each XR
+      view, which is composited directly onto the XR scene.
+
+      The surface-local coordinates for surfaces with a composite buffer
+      attached are defined from (-1, -1) to (1, 1), and correspond to X and Y
+      positions across the VR scene when projected into two dimensions.
+      <!-- TODO: From which view's perspective? -->
+
+      If a client attaches a composite buffer to a zxr_surface_v1 without
+      attaching a 2D buffer for each XR view, they are subject to the
+      contingency behaviors explained in the zxr_surface_v1 interface.
+    </description>
+
+    <enum name="error">
+      <entry name="invalid_buffer" value="0"
+        summary="client attempted to attach a 3D buffer to this composite buffer" />
+    </enum>
+
+    <request name="attach_buffer">
+      <description summary="attaches or updates a buffer for a view">
+        Attaches or updates a 2D buffer which has been prepared for a specific
+        XR view. The buffer may be set to null to clear the buffer for this
+        view, which is used mainly when the compositor has sent the
+        zxr_view_v1.finished event for that view.
+      </description>
+      <arg name="view" type="object" interface="zxr_view_v1"
+        summary="view this buffer is prepared for" />
+      <arg name="buffer" type="object" interface="wl_buffer" allow-null="true"
+        summary="2D buffer to attach for this view" />
+    </request>
+
+    <request name="get_wl_buffer">
+      <description summary="create a wl_buffer for this composite buffer">
+        Gets a wl_buffer for this composite buffer, which may then be attached
+        to a zxr_surface_v1.
+      </description>
+      <arg name="buffer" type="new_id" interface="wl_buffer"
+        summary="the newly created wl_buffer"/>
+    </request>
+  </interface>
+
+  <!--
+    TODO:
+    - Add better timing information? Prepare frames in advance? Map OpenXR more
+      closely onto this protocol.
+    - 3D geometry buffers, e.g. glTF
+    - 2D buffers with left/right views, for e.g. 3D movies
+  -->
+</protocol>

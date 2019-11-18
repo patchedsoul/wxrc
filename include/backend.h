@@ -7,6 +7,7 @@
 #include <openxr/openxr_platform.h>
 #include <wlr/backend/interface.h>
 #include <wlr/render/wlr_renderer.h>
+#include "xr-shell-protocol.h"
 
 struct wxrc_xr_view {
 	XrViewConfigurationView config;
@@ -15,6 +16,8 @@ struct wxrc_xr_view {
 	uint32_t nimages;
 	XrSwapchainImageOpenGLESKHR *images;
 	GLuint *framebuffers;
+
+	struct wxrc_zxr_view_v1 *wl_view;
 };
 
 struct wxrc_xr_backend {
