@@ -447,8 +447,10 @@ void wxrc_cursor_set_surface(struct wxrc_cursor *cursor,
 	cursor->hotspot_x = hotspot_x;
 	cursor->hotspot_y = hotspot_y;
 
-	cursor->surface_destroy.notify = cursor_handle_surface_destroy;
-	wl_signal_add(&surface->events.destroy, &cursor->surface_destroy);
+	if (cursor->surface) {
+		cursor->surface_destroy.notify = cursor_handle_surface_destroy;
+		wl_signal_add(&surface->events.destroy, &cursor->surface_destroy);
+	}
 }
 
 struct wlr_texture *wxrc_cursor_get_texture(struct wxrc_cursor *cursor,
