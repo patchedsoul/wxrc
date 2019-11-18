@@ -148,12 +148,11 @@ static struct wxrc_view *view_at(struct wxrc_server *server, XrView *xr_view,
 
 	struct wlr_surface *focus = NULL;
 	struct wxrc_view *focus_view = NULL;
-	float focus_dist = FLT_MAX;
 	vec3 cursor_pos;
 	vec3 cursor_rot;
 	float focus_sx, focus_sy;
 	struct wxrc_view *view;
-	wl_list_for_each(view, &server->views, link) {
+	wl_list_for_each_reverse(view, &server->views, link) {
 		if (!view->mapped || wxrc_view_is_xr_shell(view)) {
 			continue;
 		}
@@ -176,17 +175,18 @@ static struct wxrc_view *view_at(struct wxrc_server *server, XrView *xr_view,
 			continue;
 		}
 
+		/* TODO: Reckon between 2D and 3D views with different depth strategies
 		float dist = glm_vec3_distance(position, intersection);
 		// Add an epsilon to dist to avoid Z-index rounding errors fighting
 		if (dist + 0.01 < focus_dist) {
-			focus = surface;
-			focus_view = view;
-			focus_sx = child_sx;
-			focus_sy = child_sy;
-			focus_dist = dist;
-			glm_vec3_copy(intersection, cursor_pos);
-			glm_vec3_copy(view->rotation, cursor_rot);
 		}
+		*/
+		focus = surface;
+		focus_view = view;
+		focus_sx = child_sx;
+		focus_sy = child_sy;
+		glm_vec3_copy(intersection, cursor_pos);
+		glm_vec3_copy(view->rotation, cursor_rot);
 	}
 
 	if (focus == NULL) {
