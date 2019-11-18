@@ -2,7 +2,10 @@
 #include <linux/input-event-codes.h>
 #include <limits.h>
 #include <stdlib.h>
+#include <wlr/types/wlr_data_device.h>
 #include <wlr/types/wlr_input_device.h>
+#include <wlr/types/wlr_primary_selection.h>
+#include <wlr/types/wlr_seat.h>
 #include <wlr/util/log.h>
 #include <xkbcommon/xkbcommon.h>
 #include <unistd.h>
@@ -533,6 +536,22 @@ static void handle_request_set_cursor(struct wl_listener *listener,
 		event->hotspot_x, event->hotspot_y);
 }
 
+static void handle_request_set_selection(
+		struct wl_listener *listener, void *data) {
+	struct wxrc_server *server =
+		wl_container_of(listener, server, request_set_selection);
+	struct wlr_seat_request_set_selection_event *event = data;
+	wlr_seat_set_selection(server->seat, event->source, event->serial);
+}
+
+static void handle_request_set_primary_selection(
+		struct wl_listener *listener, void *data) {
+	struct wxrc_server *server =
+		wl_container_of(listener, server, request_set_primary_selection);
+	struct wlr_seat_request_set_primary_selection_event *event = data;
+	wlr_seat_set_primary_selection(server->seat, event->source, event->serial);
+}
+
 void wxrc_input_init(struct wxrc_server *server) {
 	wl_list_init(&server->keyboards);
 	wl_list_init(&server->pointers);
@@ -550,6 +569,13 @@ void wxrc_input_init(struct wxrc_server *server) {
 	server->request_set_cursor.notify = handle_request_set_cursor;
 	wl_signal_add(&server->seat->events.request_set_cursor,
 		&server->request_set_cursor);
+	server->request_set_selection.notify = handle_request_set_selection;
+	wl_signal_add(&server->seat->events.request_set_selection,
+		&server->request_set_selection);
+	server->request_set_primary_selection.notify =
+		handle_request_set_primary_selection;
+	wl_signal_add(&server->seat->events.request_set_primary_selection,
+		&server->request_set_primary_selection);
 
 	struct wlr_xcursor *xcursor =
 		wlr_xcursor_manager_get_xcursor(server->cursor_mgr, "left_ptr", 2);

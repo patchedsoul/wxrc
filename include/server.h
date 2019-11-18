@@ -49,6 +49,8 @@ struct wxrc_server {
 	struct wl_listener new_xdg_surface;
 	struct wl_listener new_xr_surface;
 	struct wl_listener request_set_cursor;
+	struct wl_listener request_set_selection;
+	struct wl_listener request_set_primary_selection;
 };
 
 #endif
