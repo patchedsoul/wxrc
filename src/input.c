@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <linux/input-event-codes.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <wlr/types/wlr_input_device.h>
@@ -131,6 +132,7 @@ void handle_new_keyboard(struct wxrc_server *server,
 static struct wxrc_view *view_at(struct wxrc_server *server, XrView *xr_view,
 		mat4 cursor_matrix, struct wlr_surface **surface_ptr,
 		float *sx_ptr, float *sy_ptr) {
+	/* TODO: Take into account logical Z ordering */
 	versor orientation;
 	vec3 position;
 	wxrc_xr_quaternion_to_cglm(&xr_view->pose.orientation, orientation);
@@ -244,6 +246,20 @@ static void update_pointer_move(struct wxrc_server *server, XrView *xr_view) {
 	glm_vec3_copy(rot, view->rotation);
 }
 
+static void update_pointer_resize(struct wxrc_server *server, XrView *xr_view) {
+	float sx, sy;
+	struct wxrc_view *view = view_at(server, &server->xr_views[0],
+		server->cursor.matrix, NULL, &sx, &sy);
+	if (view == NULL) {
+		return;
+	}
+
+	float diff_x = sx - server->seatop_sx,
+		  diff_y = sy - server->seatop_sy;
+	wxrc_view_set_size(view,
+			server->seatop_w + diff_x, server->seatop_h + diff_y);
+}
+
 void wxrc_update_pointer(struct wxrc_server *server, XrView *xr_view,
 		uint32_t time) {
 	switch (server->seatop) {
@@ -252,6 +268,9 @@ void wxrc_update_pointer(struct wxrc_server *server, XrView *xr_view,
 		return;
 	case WXRC_SEATOP_MOVE:
 		update_pointer_move(server, xr_view);
+		return;
+	case WXRC_SEATOP_RESIZE:
+		update_pointer_resize(server, xr_view);
 		return;
 	}
 	abort();
@@ -291,9 +310,10 @@ static void pointer_handle_button(struct wl_listener *listener, void *data) {
 
 	switch (event->state) {
 	case WLR_BUTTON_PRESSED:;
+		float sx, sy;
 		mat4 cursor_matrix;
 		struct wxrc_view *view = view_at(server, &server->xr_views[0],
-			cursor_matrix, NULL, NULL, NULL);
+			cursor_matrix, NULL, &sx, &sy);
 		if (view == NULL) {
 			break;
 		}
@@ -308,8 +328,15 @@ static void pointer_handle_button(struct wl_listener *listener, void *data) {
 			}
 		}
 
-		if (meta_pressed) {
+		if (meta_pressed && event->button == BTN_LEFT) {
 			server->seatop = WXRC_SEATOP_MOVE;
+			return;
+		} else if (meta_pressed && event->button == BTN_RIGHT) {
+			server->seatop_sx = sx, server->seatop_sy = sy;
+			wxrc_view_get_size(view, &server->seatop_w, &server->seatop_h);
+			if (server->seatop_w != 0) {
+				server->seatop = WXRC_SEATOP_RESIZE;
+			}
 			return;
 		}
 		break;
@@ -329,16 +356,18 @@ static void pointer_handle_axis(struct wl_listener *listener, void *data) {
 	struct wxrc_pointer *pointer = wl_container_of(listener, pointer, axis);
 	struct wlr_event_pointer_axis *event = data;
 	struct wxrc_server *server = pointer->server;
-	struct wxrc_view *view;
 
-	switch (server->seatop) {
-	case WXRC_SEATOP_DEFAULT:
-		wlr_seat_pointer_notify_axis(pointer->server->seat,
-			event->time_msec, event->orientation, event->delta,
-			event->delta_discrete, event->source);
-		return;
-	case WXRC_SEATOP_MOVE:
-		view = wxrc_get_focus(server);
+	bool meta_pressed = false;
+	struct wxrc_keyboard *keyboard;
+	wl_list_for_each(keyboard, &server->keyboards, link) {
+		if (keyboard_meta_pressed(keyboard)) {
+			meta_pressed = true;
+			break;
+		}
+	}
+	if (meta_pressed) {
+		/* Move window towards/away from the camera */
+		struct wxrc_view *view = wxrc_get_focus(server);
 		if (view == NULL) {
 			return;
 		}
@@ -360,6 +389,10 @@ static void pointer_handle_axis(struct wl_listener *listener, void *data) {
 		glm_vec3_copy(rot, view->rotation);
 		return;
 	}
+
+	wlr_seat_pointer_notify_axis(pointer->server->seat,
+		event->time_msec, event->orientation, event->delta,
+		event->delta_discrete, event->source);
 }
 
 static void pointer_handle_frame(struct wl_listener *listener, void *data) {

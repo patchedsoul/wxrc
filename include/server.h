@@ -38,6 +38,8 @@ struct wxrc_server {
 	struct wxrc_cursor cursor;
 	vec3 pointer_rotation; /* relative to the first XR view's orientation */
 	enum wxrc_seatop seatop;
+	float seatop_sx, seatop_sy;
+	int seatop_w, seatop_h;
 
 	struct wl_list keyboards;
 	struct wl_list pointers;

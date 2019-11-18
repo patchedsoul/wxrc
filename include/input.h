@@ -12,6 +12,7 @@ struct wxrc_server;
 enum wxrc_seatop {
 	WXRC_SEATOP_DEFAULT,
 	WXRC_SEATOP_MOVE,
+	WXRC_SEATOP_RESIZE,
 };
 
 struct wxrc_keyboard {

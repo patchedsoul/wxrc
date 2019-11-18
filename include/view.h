@@ -23,6 +23,8 @@ struct wxrc_view_interface {
 		double sx, double sy, double *child_sx, double *child_sy);
 	void (*set_activated)(struct wxrc_view *view, bool activated);
 	void (*close)(struct wxrc_view *view);
+	void (*get_size)(struct wxrc_view *view, int *width, int *height);
+	void (*set_size)(struct wxrc_view *view, int width, int height);
 };
 
 struct wxrc_view {
@@ -70,6 +72,12 @@ struct wxrc_view *wxrc_get_focus(struct wxrc_server *server);
 void wxrc_set_focus(struct wxrc_view *view);
 void wxrc_view_begin_move(struct wxrc_view *view);
 void wxrc_view_close(struct wxrc_view *view);
+
+/* Sets to zero if surface is not two dimensional */
+/* TODO: 3D resize? */
+void wxrc_view_get_size(struct wxrc_view *view, int *width, int *height);
+void wxrc_view_set_size(struct wxrc_view *view, int width, int height);
+
 void wxrc_view_for_each_surface(struct wxrc_view *view,
 	wlr_surface_iterator_func_t iterator, void *user_data);
 struct wlr_surface *wxrc_view_surface_at(struct wxrc_view *view,

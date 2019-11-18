@@ -110,6 +110,20 @@ void wxrc_view_close(struct wxrc_view *view) {
 	}
 }
 
+void wxrc_view_get_size(struct wxrc_view *view, int *width, int *height) {
+	if (view->impl->get_size) {
+		view->impl->get_size(view, width, height);
+	} else {
+		*width = *height = 0;
+	}
+}
+
+void wxrc_view_set_size(struct wxrc_view *view, int width, int height) {
+	if (view->impl->set_size) {
+		view->impl->set_size(view, width, height);
+	}
+}
+
 void wxrc_view_for_each_surface(struct wxrc_view *view,
 		wlr_surface_iterator_func_t iterator, void *user_data) {
 	if (view->impl->for_each_surface) {

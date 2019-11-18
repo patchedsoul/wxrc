@@ -40,11 +40,36 @@ static void close(struct wxrc_view *view) {
 	wlr_xdg_toplevel_send_close(xdg_view->xdg_surface);
 }
 
+static void get_size(struct wxrc_view *view, int *width, int *height) {
+	struct wxrc_xdg_shell_view *xdg_view = xdg_shell_view_from_view(view);
+	*width = xdg_view->xdg_surface->surface->current.width,
+		*height = xdg_view->xdg_surface->surface->current.height;
+}
+
+static void set_size(struct wxrc_view *view, int width, int height) {
+	struct wxrc_xdg_shell_view *xdg_view = xdg_shell_view_from_view(view);
+	if (width < 640) {
+		width = 640;
+	}
+	if (height < 480) {
+		height = 480;
+	}
+	if (width > 3840) {
+		width = 3840;
+	}
+	if (height > 2160) {
+		height = 2160;
+	}
+	wlr_xdg_toplevel_set_size(xdg_view->xdg_surface, width, height);
+}
+
 static const struct wxrc_view_interface xdg_shell_view_impl = {
 	.for_each_surface = for_each_surface,
 	.surface_at = surface_at,
 	.set_activated = set_activated,
 	.close = close,
+	.get_size = get_size,
+	.set_size = set_size,
 };
 
 static void handle_xdg_surface_map(struct wl_listener *listener, void *data) {
