@@ -152,7 +152,7 @@ static struct wxrc_view *view_at(struct wxrc_server *server, XrView *xr_view,
 	vec3 cursor_rot;
 	float focus_sx, focus_sy;
 	struct wxrc_view *view;
-	wl_list_for_each_reverse(view, &server->views, link) {
+	wl_list_for_each(view, &server->views, link) {
 		if (!view->mapped || wxrc_view_is_xr_shell(view)) {
 			continue;
 		}
@@ -187,6 +187,7 @@ static struct wxrc_view *view_at(struct wxrc_server *server, XrView *xr_view,
 		focus_sy = child_sy;
 		glm_vec3_copy(intersection, cursor_pos);
 		glm_vec3_copy(view->rotation, cursor_rot);
+		break;
 	}
 
 	if (focus == NULL) {
