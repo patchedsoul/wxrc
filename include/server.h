@@ -33,10 +33,8 @@ struct wxrc_server {
 
 	struct wlr_seat *seat;
 	struct wlr_xcursor_manager *cursor_mgr;
-	struct wlr_xcursor_image *xcursor_image;
-	struct wlr_texture *cursor;
+	struct wxrc_cursor cursor;
 	vec3 pointer_rotation; /* relative to the first XR view's orientation */
-	mat4 cursor_matrix;
 	enum wxrc_seatop seatop;
 
 	struct wl_list keyboards;
@@ -45,6 +43,7 @@ struct wxrc_server {
 	struct wl_listener new_input;
 	struct wl_listener new_output;
 	struct wl_listener new_xdg_surface;
+	struct wl_listener request_set_cursor;
 };
 
 #endif

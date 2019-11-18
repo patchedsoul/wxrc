@@ -211,7 +211,7 @@ static void update_pointer_default(struct wxrc_server *server, XrView *xr_view,
 		uint32_t time) {
 	float sx, sy;
 	struct wlr_surface *surface;
-	struct wxrc_view *focus = view_at(server, xr_view, server->cursor_matrix,
+	struct wxrc_view *focus = view_at(server, xr_view, server->cursor.matrix,
 		&surface, &sx, &sy);
 	if (focus != NULL) {
 		wlr_seat_pointer_notify_enter(server->seat, surface, sx, sy);
@@ -358,7 +358,7 @@ static void handle_new_pointer(struct wxrc_server *server,
 	wl_signal_add(&device->pointer->events.frame, &pointer->frame);
 }
 
-void handle_new_input(struct wl_listener *listener, void *data) {
+static void handle_new_input(struct wl_listener *listener, void *data) {
 	struct wxrc_server *server = wl_container_of(listener, server, new_input);
 	struct wlr_input_device *device = data;
 	wlr_log(WLR_DEBUG, "New input device '%s'", device->name);
@@ -380,6 +380,95 @@ void handle_new_input(struct wl_listener *listener, void *data) {
 	wlr_seat_set_capabilities(server->seat, caps);
 }
 
+static void cursor_reset(struct wxrc_cursor *cursor) {
+	wlr_texture_destroy(cursor->xcursor_texture);
+	cursor->xcursor_texture = NULL;
+	cursor->xcursor_image = NULL;
+
+	wl_list_remove(&cursor->surface_destroy.link);
+	wl_list_init(&cursor->surface_destroy.link);
+	cursor->surface = NULL;
+}
+
+void wxrc_cursor_set_xcursor(struct wxrc_cursor *cursor,
+		struct wlr_xcursor *xcursor) {
+	cursor_reset(cursor);
+
+	cursor->xcursor_image = xcursor->images[0];
+
+	struct wlr_renderer *renderer =
+		wlr_backend_get_renderer(cursor->server->backend);
+	cursor->xcursor_texture = wlr_texture_from_pixels(renderer,
+		WL_SHM_FORMAT_ARGB8888, cursor->xcursor_image->width * 4,
+		cursor->xcursor_image->width, cursor->xcursor_image->height,
+		cursor->xcursor_image->buffer);
+}
+
+static void cursor_handle_surface_destroy(struct wl_listener *listener,
+		void *data) {
+	struct wxrc_cursor *cursor =
+		wl_container_of(listener, cursor, surface_destroy);
+	cursor_reset(cursor);
+}
+
+void wxrc_cursor_set_surface(struct wxrc_cursor *cursor,
+		struct wlr_surface *surface, int hotspot_x, int hotspot_y) {
+	cursor_reset(cursor);
+
+	cursor->surface = surface;
+	cursor->hotspot_x = hotspot_x;
+	cursor->hotspot_y = hotspot_y;
+
+	cursor->surface_destroy.notify = cursor_handle_surface_destroy;
+	wl_signal_add(&surface->events.destroy, &cursor->surface_destroy);
+}
+
+struct wlr_texture *wxrc_cursor_get_texture(struct wxrc_cursor *cursor,
+		int *hotspot_x, int *hotspot_y, int *scale) {
+	*hotspot_x = *hotspot_y = *scale = 0;
+
+	if (cursor->surface != NULL && cursor->surface->buffer != NULL &&
+			cursor->surface->buffer->texture != NULL) {
+		*hotspot_x = cursor->hotspot_x + cursor->surface->sx;
+		*hotspot_y = cursor->hotspot_y + cursor->surface->sy;
+		*scale = cursor->surface->current.scale;
+		return cursor->surface->buffer->texture;
+	}
+
+	if (cursor->xcursor_texture != NULL) {
+		*hotspot_x = cursor->xcursor_image->hotspot_x;
+		*hotspot_y = cursor->xcursor_image->hotspot_y;
+		*scale = 2;
+		return cursor->xcursor_texture;
+	}
+
+	return NULL;
+}
+
+static void handle_request_set_cursor(struct wl_listener *listener,
+		void *data) {
+	struct wxrc_server *server =
+		wl_container_of(listener, server, request_set_cursor);
+	struct wlr_seat_pointer_request_set_cursor_event *event = data;
+
+	struct wl_client *focused_client = NULL;
+	struct wlr_surface *focused_surface =
+		server->seat->pointer_state.focused_surface;
+	if (focused_surface != NULL) {
+		focused_client = wl_resource_get_client(focused_surface->resource);
+	}
+
+	// TODO: check cursor mode
+	if (focused_client == NULL ||
+			event->seat_client->client != focused_client) {
+		wlr_log(WLR_DEBUG, "Denying request to set cursor from unfocused client");
+		return;
+	}
+
+	wxrc_cursor_set_surface(&server->cursor, event->surface,
+		event->hotspot_x, event->hotspot_y);
+}
+
 void wxrc_input_init(struct wxrc_server *server) {
 	wl_list_init(&server->keyboards);
 	wl_list_init(&server->pointers);
@@ -388,15 +477,17 @@ void wxrc_input_init(struct wxrc_server *server) {
 	server->cursor_mgr = wlr_xcursor_manager_create(NULL, 24);
 	wlr_xcursor_manager_load(server->cursor_mgr, 2);
 
-	struct wlr_renderer *renderer = wlr_backend_get_renderer(server->backend);
-	struct wlr_xcursor *xcursor =
-		wlr_xcursor_manager_get_xcursor(server->cursor_mgr, "left_ptr", 2);
-	server->xcursor_image = xcursor->images[0];
-	server->cursor = wlr_texture_from_pixels(renderer,
-			WL_SHM_FORMAT_ARGB8888, server->xcursor_image->width * 4,
-			server->xcursor_image->width, server->xcursor_image->height,
-			server->xcursor_image->buffer);
+	server->cursor.server = server;
+	wl_list_init(&server->cursor.surface_destroy.link);
 
 	server->new_input.notify = handle_new_input;
 	wl_signal_add(&server->backend->events.new_input, &server->new_input);
+
+	server->request_set_cursor.notify = handle_request_set_cursor;
+	wl_signal_add(&server->seat->events.request_set_cursor,
+		&server->request_set_cursor);
+
+	struct wlr_xcursor *xcursor =
+		wlr_xcursor_manager_get_xcursor(server->cursor_mgr, "left_ptr", 2);
+	wxrc_cursor_set_xcursor(&server->cursor, xcursor);
 }

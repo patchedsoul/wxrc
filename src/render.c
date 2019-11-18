@@ -330,15 +330,18 @@ static void render_view(struct wxrc_gl *gl,
 
 static void render_cursor(struct wxrc_server *server,
 		struct wxrc_gl *gl, mat4 vp_matrix, mat4 cursor_matrix) {
-	struct wlr_xcursor_image *xcursor_image = server->xcursor_image;
-	struct wlr_texture *tex = server->cursor;
+	int hotspot_x, hotspot_y, scale;
+	struct wlr_texture *tex = wxrc_cursor_get_texture(&server->cursor,
+		&hotspot_x, &hotspot_y, &scale);
+	if (tex == NULL) {
+		return;
+	}
 
 	int width, height;
 	wlr_texture_get_size(tex, &width, &height);
 
-	/* The scale is different here because we use a 2x cursor image */
-	float scale_x = width / WXRC_SURFACE_SCALE / 2;
-	float scale_y = height / WXRC_SURFACE_SCALE / 2;
+	float scale_x = (float)width / WXRC_SURFACE_SCALE / scale;
+	float scale_y = (float)height / WXRC_SURFACE_SCALE / scale;
 
 	mat4 model_matrix;
 	glm_mat4_copy(cursor_matrix, model_matrix);
@@ -346,8 +349,8 @@ static void render_cursor(struct wxrc_server *server,
 
 	/* Re-origin the cursor to the center and apply hotspot */
 	glm_translate(model_matrix, (vec3){
-		-(float)xcursor_image->hotspot_x / width,
-		-1.0 + (float)xcursor_image->hotspot_y / height, 0 });
+		-(float)hotspot_x / width,
+		-1.0 + (float)hotspot_y / height, 0 });
 
 	mat4 mvp_matrix = GLM_MAT4_IDENTITY_INIT;
 	glm_mat4_mul(vp_matrix, model_matrix, mvp_matrix);
@@ -374,7 +377,7 @@ void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 	}
 
 	if (server->seat->pointer_state.focused_surface != NULL) {
-		render_cursor(server, &server->gl, vp_matrix, server->cursor_matrix);
+		render_cursor(server, &server->gl, vp_matrix, server->cursor.matrix);
 	}
 }
 
