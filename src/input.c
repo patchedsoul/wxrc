@@ -328,10 +328,38 @@ static void pointer_handle_button(struct wl_listener *listener, void *data) {
 static void pointer_handle_axis(struct wl_listener *listener, void *data) {
 	struct wxrc_pointer *pointer = wl_container_of(listener, pointer, axis);
 	struct wlr_event_pointer_axis *event = data;
+	struct wxrc_server *server = pointer->server;
+	struct wxrc_view *view;
 
-	wlr_seat_pointer_notify_axis(pointer->server->seat,
-		event->time_msec, event->orientation, event->delta,
-		event->delta_discrete, event->source);
+	switch (server->seatop) {
+	case WXRC_SEATOP_DEFAULT:
+		wlr_seat_pointer_notify_axis(pointer->server->seat,
+			event->time_msec, event->orientation, event->delta,
+			event->delta_discrete, event->source);
+		return;
+	case WXRC_SEATOP_MOVE:
+		view = wxrc_get_focus(server);
+		if (view == NULL) {
+			return;
+		}
+
+		XrView *xr_view = &server->xr_views[0];
+
+		mat4 view_matrix;
+		wxrc_xr_view_get_matrix(xr_view, view_matrix);
+		wxrc_mat4_rotate(view_matrix, server->pointer_rotation);
+
+		double delta = event->delta * 0.025;
+		vec3 pos = { 0.0, 0.0, -glm_vec3_norm(view->position) + delta };
+		glm_vec3_rotate_m4(view_matrix, pos, pos);
+
+		vec3 rot;
+		glm_euler_angles(view_matrix, rot);
+
+		glm_vec3_copy(pos, view->position);
+		glm_vec3_copy(rot, view->rotation);
+		return;
+	}
 }
 
 static void pointer_handle_frame(struct wl_listener *listener, void *data) {
