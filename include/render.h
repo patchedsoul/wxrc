@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <GLES2/gl2.h>
 #include <openxr/openxr.h>
+#include "gltf.h"
 
 struct wxrc_xr_view;
 struct wxrc_server;
@@ -13,6 +14,9 @@ struct wxrc_gl {
 	GLuint grid_program;
 	GLuint texture_rgb_program;
 	GLuint texture_external_program;
+	GLuint gltf_program;
+
+	struct wxrc_gltf_model model;
 };
 
 #define WXRC_SURFACE_SCALE 300.0

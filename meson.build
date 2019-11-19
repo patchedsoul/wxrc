@@ -35,6 +35,7 @@ add_project_arguments(cc.get_supported_arguments([
 ]), language: 'c')
 
 cglm = dependency('cglm')
+cgltf = dependency('cgltf', fallback: ['cgltf', 'cgltf'])
 egl = dependency('egl')
 gbm = dependency('gbm')
 glesv2 = dependency('glesv2')
@@ -65,6 +66,7 @@ wxrc_inc = include_directories('include')
 executable('wxrc',
 	files(
 		'src/backend.c',
+		'src/gltf.c',
 		'src/input.c',
 		'src/main.c',
 		'src/mathutil.c',
@@ -77,6 +79,7 @@ executable('wxrc',
 	),
 	dependencies: [
 		cglm,
+		cgltf,
 		egl,
 		glesv2,
 		openxr,

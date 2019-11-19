@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 199309L
 #include <cglm/cglm.h>
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
@@ -91,6 +92,29 @@ static const GLchar texture_external_fragment_shader_src[] =
 	"	gl_FragColor = texture2D(tex, vertex_tex_coord);\n"
 	"}\n";
 
+static const GLchar gltf_vertex_shader_src[] =
+	"#version 100\n"
+	"\n"
+	"attribute vec3 pos;\n"
+	"uniform mat4 mvp;\n"
+	"\n"
+	"varying vec3 vertex_pos;\n"
+	"\n"
+	"void main() {\n"
+	"	gl_Position = mvp * vec4(pos, 1.0);\n"
+	"	vertex_pos = pos;\n"
+	"}\n";
+
+static const GLchar gltf_fragment_shader_src[] =
+	"#version 100\n"
+	"precision mediump float;\n"
+	"\n"
+	"varying vec3 vertex_pos;\n"
+	"\n"
+	"void main() {\n"
+	"	gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);\n"
+	"}\n";
+
 static GLuint wxrc_gl_compile_shader(GLuint type, const GLchar *src) {
 	GLuint shader = glCreateShader(type);
 	glShaderSource(shader, 1, &src, NULL);
@@ -135,6 +159,12 @@ bool wxrc_gl_init(struct wxrc_gl *gl) {
 			.fragment_src = texture_external_fragment_shader_src,
 			.program_ptr = &gl->texture_external_program,
 		},
+		{
+			.name = "gltf",
+			.vertex_src = gltf_vertex_shader_src,
+			.fragment_src = gltf_fragment_shader_src,
+			.program_ptr = &gl->gltf_program,
+		},
 	};
 
 	for (size_t i = 0; i < sizeof(jobs) / sizeof(jobs[0]); i++) {
@@ -175,6 +205,10 @@ bool wxrc_gl_init(struct wxrc_gl *gl) {
 		*job->program_ptr = shader_program;
 	}
 
+	if (!wxrc_gltf_model_init(&gl->model, gl, "Box.glb")) {
+		return false;
+	}
+
 	return true;
 }
 
@@ -182,6 +216,9 @@ void wxrc_gl_finish(struct wxrc_gl *gl) {
 	glDeleteProgram(gl->grid_program);
 	glDeleteProgram(gl->texture_rgb_program);
 	glDeleteProgram(gl->texture_external_program);
+	glDeleteProgram(gl->gltf_program);
+
+	wxrc_gltf_model_finish(&gl->model);
 }
 
 static const float fg_color[] = { 1.0, 1.0, 1.0, 1.0 };
@@ -425,6 +462,15 @@ void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 	}
 
 	glDepthMask(GL_TRUE);
+
+	mat4 model_matrix = GLM_MAT4_IDENTITY_INIT;
+	glm_translate(model_matrix, (vec3){ 0.0, 0.0, -3.0 });
+	glm_rotate_y(model_matrix, 0.4, model_matrix);
+
+	mat4 mvp_matrix;
+	glm_mat4_mul(vp_matrix, model_matrix, mvp_matrix);
+
+	wxrc_gltf_model_render(&server->gl.model, mvp_matrix);
 }
 
 void wxrc_gl_render_xr_view(struct wxrc_server *server, struct wxrc_xr_view *view,
