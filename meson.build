@@ -38,6 +38,7 @@ cglm = dependency('cglm')
 egl = dependency('egl')
 gbm = dependency('gbm')
 glesv2 = dependency('glesv2')
+libjpeg = dependency('libjpeg')
 openxr = dependency('openxr')
 xkbcommon = dependency('xkbcommon')
 wayland_client = dependency('wayland-client')
@@ -79,6 +80,7 @@ executable('wxrc',
 		cglm,
 		egl,
 		glesv2,
+		libjpeg,
 		openxr,
 		wlroots,
 		xkbcommon,

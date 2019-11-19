@@ -13,6 +13,9 @@ struct wxrc_gl {
 	GLuint grid_program;
 	GLuint texture_rgb_program;
 	GLuint texture_external_program;
+	GLuint cube_map_program;
+
+	GLuint cube_map_tex;
 };
 
 #define WXRC_SURFACE_SCALE 300.0

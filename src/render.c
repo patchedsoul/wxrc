@@ -3,6 +3,7 @@
 #include <EGL/eglext.h>
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
+#include <jpeglib.h>
 #include <stdlib.h>
 #include <wlr/util/log.h>
 #include <wlr/render/gles2.h>
@@ -91,6 +92,31 @@ static const GLchar texture_external_fragment_shader_src[] =
 	"	gl_FragColor = texture2D(tex, vertex_tex_coord);\n"
 	"}\n";
 
+static const GLchar cube_map_vertex_shader_src[] =
+	"#version 100\n"
+	"\n"
+	"attribute vec3 pos;\n"
+	"uniform mat4 vp;\n"
+	"\n"
+	"varying vec3 vertex_tex_coord;\n"
+	"\n"
+	"void main() {\n"
+	"	vertex_tex_coord = pos;\n"
+	"	gl_Position = vp * vec4(pos, 1.0);\n"
+	"}\n";
+
+static const GLchar cube_map_fragment_shader_src[] =
+	"#version 100\n"
+	"precision mediump float;\n"
+	"\n"
+	"uniform samplerCube tex;\n"
+	"\n"
+	"varying vec3 vertex_tex_coord;\n"
+	"\n"
+	"void main() {\n"
+	"	gl_FragColor = textureCube(tex, vertex_tex_coord);\n"
+	"}\n";
+
 static GLuint wxrc_gl_compile_shader(GLuint type, const GLchar *src) {
 	GLuint shader = glCreateShader(type);
 	glShaderSource(shader, 1, &src, NULL);
@@ -115,6 +141,8 @@ struct wxrc_shader_build_job {
 	GLuint *program_ptr;
 };
 
+static GLuint create_cube_map(void);
+
 bool wxrc_gl_init(struct wxrc_gl *gl) {
 	struct wxrc_shader_build_job jobs[] = {
 		{
@@ -134,6 +162,12 @@ bool wxrc_gl_init(struct wxrc_gl *gl) {
 			.vertex_src = texture_vertex_shader_src,
 			.fragment_src = texture_external_fragment_shader_src,
 			.program_ptr = &gl->texture_external_program,
+		},
+		{
+			.name = "cube_map",
+			.vertex_src = cube_map_vertex_shader_src,
+			.fragment_src = cube_map_fragment_shader_src,
+			.program_ptr = &gl->cube_map_program,
 		},
 	};
 
@@ -175,6 +209,11 @@ bool wxrc_gl_init(struct wxrc_gl *gl) {
 		*job->program_ptr = shader_program;
 	}
 
+	gl->cube_map_tex = create_cube_map();
+	if (gl->cube_map_tex == 0) {
+		return false;
+	}
+
 	return true;
 }
 
@@ -182,6 +221,7 @@ void wxrc_gl_finish(struct wxrc_gl *gl) {
 	glDeleteProgram(gl->grid_program);
 	glDeleteProgram(gl->texture_rgb_program);
 	glDeleteProgram(gl->texture_external_program);
+	glDeleteProgram(gl->cube_map_program);
 }
 
 static const float fg_color[] = { 1.0, 1.0, 1.0, 1.0 };
@@ -393,6 +433,8 @@ static void render_cursor(struct wxrc_server *server,
 	render_texture(gl, tex, mvp_matrix);
 }
 
+static void render_cube_map(struct wxrc_gl *gl, mat4 vp_matrix);
+
 void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 		mat4 view_matrix, mat4 projection_matrix) {
 	glClearColor(bg_color[0], bg_color[1], bg_color[2], bg_color[3]);
@@ -401,6 +443,7 @@ void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 	mat4 vp_matrix = GLM_MAT4_IDENTITY_INIT;
 	glm_mat4_mul(projection_matrix, view_matrix, vp_matrix);
 
+	render_cube_map(&server->gl, vp_matrix);
 	render_grid(&server->gl, vp_matrix);
 
 	struct wxrc_view *wxrc_view;
@@ -444,4 +487,178 @@ void wxrc_gl_render_xr_view(struct wxrc_server *server, struct wxrc_xr_view *vie
 
 void wxrc_get_projection_matrix(XrView *xr_view, mat4 projection_matrix) {
 	wxrc_xr_projection_from_fov(&xr_view->fov, 0.05, 100.0, projection_matrix);
+}
+
+static bool load_cube_map_side_jpeg(GLuint texture, GLenum side_target,
+		const char *path) {
+	wlr_log(WLR_DEBUG, "Loading cube map side %s", path);
+
+	FILE *f = fopen(path, "rb");
+	if (f == NULL) {
+		wlr_log_errno(WLR_ERROR, "Failed to open cube map side file %s",
+			path);
+		return false;
+	}
+
+	struct jpeg_error_mgr err = {0};
+	struct jpeg_decompress_struct info = {
+		.err = jpeg_std_error(&err),
+	};
+	jpeg_create_decompress(&info);
+
+	jpeg_stdio_src(&info, f);
+	jpeg_read_header(&info, TRUE);
+
+	jpeg_start_decompress(&info);
+
+	wlr_log(WLR_DEBUG, "Starting to decompress image: %dx%d (%d components)",
+		info.output_width, info.output_height, info.num_components);
+
+	GLenum gl_format;
+	switch (info.num_components) {
+	case 3:
+		gl_format = GL_RGB;
+		break;
+	case 4:
+		gl_format = GL_RGBA;
+		break;
+	default:
+		return false;
+	}
+
+	size_t data_size =
+		info.output_width * info.output_height * info.num_components;
+	uint8_t *data = malloc(data_size);
+	while (info.output_scanline < info.output_height) {
+		uint8_t *row = data + info.num_components * info.output_width *
+			info.output_scanline;
+		jpeg_read_scanlines(&info, &row, 1);
+	}
+
+	jpeg_finish_decompress(&info);
+	fclose(f);
+
+	glBindTexture(GL_TEXTURE_CUBE_MAP, texture);
+	glTexImage2D(side_target, 0, gl_format, info.output_width,
+		info.output_height, 0, gl_format, GL_UNSIGNED_BYTE, data);
+	free(data);
+
+	return true;
+}
+
+static GLuint create_cube_map(void) {
+	GLuint texture;
+	glActiveTexture(GL_TEXTURE0);
+	glGenTextures(1, &texture);
+
+	const char *paths[] = {
+		"bg/posx.jpg",
+		"bg/negx.jpg",
+		"bg/posy.jpg",
+		"bg/negy.jpg",
+		"bg/posz.jpg",
+		"bg/negz.jpg",
+	};
+	const GLenum targets[] = {
+		GL_TEXTURE_CUBE_MAP_POSITIVE_X,
+		GL_TEXTURE_CUBE_MAP_NEGATIVE_X,
+		GL_TEXTURE_CUBE_MAP_POSITIVE_Y,
+		GL_TEXTURE_CUBE_MAP_NEGATIVE_Y,
+		GL_TEXTURE_CUBE_MAP_POSITIVE_Z,
+		GL_TEXTURE_CUBE_MAP_NEGATIVE_Z,
+	};
+	for (size_t i = 0; i < sizeof(targets) / sizeof(targets[0]); i++) {
+		if (!load_cube_map_side_jpeg(texture, targets[i], paths[i])) {
+			return 0;
+		}
+	}
+
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	//glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+	return texture;
+}
+
+static void render_cube_map(struct wxrc_gl *gl, mat4 vp_matrix) {
+	GLuint prog = gl->cube_map_program;
+
+	GLint pos_loc = glGetAttribLocation(prog, "pos");
+	GLint vp_loc = glGetUniformLocation(prog, "vp");
+	GLint tex_loc = glGetUniformLocation(prog, "tex");
+
+	glUseProgram(prog);
+
+	glUniform1i(tex_loc, 0);
+
+	mat4 model_matrix;
+	glm_mat4_identity(model_matrix);
+	glm_translate(model_matrix, (vec3){ 0.0, -1.0, 0.0 });
+	glm_scale(model_matrix, (vec3){ 50.0, 50.0, 50.0 });
+	glm_rotate(model_matrix, glm_rad(90.0), (vec3){ 1.0, 0.0, 0.0 });
+
+	glUniformMatrix4fv(vp_loc, 1, GL_FALSE, (GLfloat *)vp_matrix);
+
+	size_t npoints = 36;
+	const float points[] = {
+		-10.0f,  10.0f, -10.0f,
+		-10.0f, -10.0f, -10.0f,
+		10.0f, -10.0f, -10.0f,
+		10.0f, -10.0f, -10.0f,
+		10.0f,  10.0f, -10.0f,
+		-10.0f,  10.0f, -10.0f,
+
+		-10.0f, -10.0f,  10.0f,
+		-10.0f, -10.0f, -10.0f,
+		-10.0f,  10.0f, -10.0f,
+		-10.0f,  10.0f, -10.0f,
+		-10.0f,  10.0f,  10.0f,
+		-10.0f, -10.0f,  10.0f,
+
+		10.0f, -10.0f, -10.0f,
+		10.0f, -10.0f,  10.0f,
+		10.0f,  10.0f,  10.0f,
+		10.0f,  10.0f,  10.0f,
+		10.0f,  10.0f, -10.0f,
+		10.0f, -10.0f, -10.0f,
+
+		-10.0f, -10.0f,  10.0f,
+		-10.0f,  10.0f,  10.0f,
+		10.0f,  10.0f,  10.0f,
+		10.0f,  10.0f,  10.0f,
+		10.0f, -10.0f,  10.0f,
+		-10.0f, -10.0f,  10.0f,
+
+		-10.0f,  10.0f, -10.0f,
+		10.0f,  10.0f, -10.0f,
+		10.0f,  10.0f,  10.0f,
+		10.0f,  10.0f,  10.0f,
+		-10.0f,  10.0f,  10.0f,
+		-10.0f,  10.0f, -10.0f,
+
+		-10.0f, -10.0f, -10.0f,
+		-10.0f, -10.0f,  10.0f,
+		10.0f, -10.0f, -10.0f,
+		10.0f, -10.0f, -10.0f,
+		-10.0f, -10.0f,  10.0f,
+		10.0f, -10.0f,  10.0f,
+	};
+
+	GLint coords_per_point = sizeof(points) / sizeof(points[0]) / npoints;
+	glVertexAttribPointer(pos_loc, coords_per_point,
+		GL_FLOAT, GL_FALSE, 0, points);
+	glEnableVertexAttribArray(pos_loc);
+
+	glDepthMask(GL_FALSE);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, gl->cube_map_tex);
+	glDepthMask(GL_TRUE);
+
+	glDrawArrays(GL_TRIANGLES, 0, npoints);
+
+	glDisableVertexAttribArray(pos_loc);
+
+	glUseProgram(0);
 }
