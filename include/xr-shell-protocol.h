@@ -5,6 +5,7 @@
 #include <wayland-server-core.h>
 #include <wlr/render/wlr_renderer.h>
 #include <wlr/types/wlr_buffer.h>
+#include "zxr-shell-unstable-v1-protocol.h"
 
 struct wxrc_zxr_view_v1 {
 	struct wl_global *global;
@@ -63,6 +64,7 @@ struct wxrc_zxr_composite_buffer_v1_view_buffer {
 
 	struct wl_resource *resource;
 	struct wlr_buffer *buffer; // Unset unless wlr_buffer was created for us
+	enum zxr_composite_buffer_v1_buffer_type buffer_type;
 
 	struct wl_list link; // wxrc_zxr_composite_buffer_v1.buffers
 };
@@ -115,6 +117,7 @@ struct wxrc_zxr_composite_buffer_v1 *wxrc_zxr_composite_buffer_v1_from_buffer(
  */
 struct wlr_texture *wxrc_zxr_composite_buffer_v1_for_view(
 		struct wxrc_zxr_composite_buffer_v1 *buffer,
-		struct wxrc_zxr_view_v1 *view);
+		struct wxrc_zxr_view_v1 *view,
+		enum zxr_composite_buffer_v1_buffer_type buffer_type);
 
 #endif

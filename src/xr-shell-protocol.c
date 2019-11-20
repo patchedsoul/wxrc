@@ -47,10 +47,13 @@ struct wxrc_zxr_composite_buffer_v1 *wxrc_zxr_composite_buffer_v1_from_buffer(
 
 struct wlr_texture *wxrc_zxr_composite_buffer_v1_for_view(
 		struct wxrc_zxr_composite_buffer_v1 *buffer,
-		struct wxrc_zxr_view_v1 *view) {
+		struct wxrc_zxr_view_v1 *view,
+		enum zxr_composite_buffer_v1_buffer_type buffer_type) {
 	struct wxrc_zxr_composite_buffer_v1_view_buffer *vb;
 	wl_list_for_each(vb, &buffer->buffers, link) {
-		if (vb->view == view && vb->buffer != NULL) {
+		if (vb->view == view
+				&& vb->buffer_type == buffer_type
+				&& vb->buffer != NULL) {
 			return vb->buffer->texture;
 		}
 	}
@@ -128,15 +131,24 @@ static const struct wlr_buffer_impl composite_wlr_buffer_impl = {
 
 static void composite_buffer_handle_attach_buffer(struct wl_client *client,
 		struct wl_resource *resource, struct wl_resource *view_resource,
-		struct wl_resource *buffer) {
+		struct wl_resource *buffer, uint32_t buffer_type) {
 	struct wxrc_zxr_composite_buffer_v1 *cbuffer =
 		composite_buffer_from_resource(resource);
 	struct wxrc_zxr_view_v1 *view = view_from_resource(view_resource);
 
+	if (buffer_type != ZXR_COMPOSITE_BUFFER_V1_BUFFER_TYPE_PIXEL_BUFFER
+			&& buffer_type != ZXR_COMPOSITE_BUFFER_V1_BUFFER_TYPE_DEPTH_BUFFER) {
+		wl_resource_post_error(resource,
+				ZXR_COMPOSITE_BUFFER_V1_ERROR_INVALID_BUFFER,
+				"Unknown buffer type %d", buffer_type);
+		return;
+	}
+
 	struct wxrc_zxr_composite_buffer_v1_view_buffer *_view_buffer,
 		*view_buffer = NULL;
 	wl_list_for_each(_view_buffer, &cbuffer->buffers, link) {
-		if (_view_buffer->view == view) {
+		if (_view_buffer->view == view
+				&& _view_buffer->buffer_type == buffer_type) {
 			view_buffer = _view_buffer;
 			break;
 		}
@@ -159,6 +171,7 @@ static void composite_buffer_handle_attach_buffer(struct wl_client *client,
 		view_buffer = calloc(1,
 				sizeof(struct wxrc_zxr_composite_buffer_v1_view_buffer));
 		view_buffer->view = view;
+		view_buffer->buffer_type = buffer_type;
 		wl_list_insert(&cbuffer->buffers, &view_buffer->link);
 	}
 

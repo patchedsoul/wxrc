@@ -341,7 +341,8 @@ static void render_xr_shell_view(struct wxrc_gl *gl, mat4 vp_matrix,
 	struct wxrc_zxr_composite_buffer_v1 *comp_buffer =
 		wxrc_zxr_composite_buffer_v1_from_buffer(buffer);
 	struct wlr_texture *tex = wxrc_zxr_composite_buffer_v1_for_view(
-		comp_buffer, xr_view->wl_view);
+		comp_buffer, xr_view->wl_view,
+		ZXR_COMPOSITE_BUFFER_V1_BUFFER_TYPE_PIXEL_BUFFER);
 	if (tex == NULL) {
 		/* TODO: Don't show on one view if we can't show on all views */
 		wlr_log(WLR_DEBUG, "Attempted to render XR surface without texture");

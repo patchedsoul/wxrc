@@ -309,7 +309,8 @@ static void render_view(struct cube_xr_view *view, uint32_t time) {
 	glFinish();
 
 	zxr_composite_buffer_v1_attach_buffer(
-			composite_buffer, view->view, buffer->buffer);
+			composite_buffer, view->view, buffer->buffer,
+			ZXR_COMPOSITE_BUFFER_V1_BUFFER_TYPE_PIXEL_BUFFER);
 }
 
 static void render(uint32_t time) {

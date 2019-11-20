@@ -135,7 +135,9 @@
   <interface name="zxr_composite_buffer_v1" version="1">
     <description summary="a buffer containing one 2D buffer for each XR view">
       An XR composite buffer consists of several 2D buffers, one for each XR
-      view, which is composited directly onto the XR scene.
+      view, which is composited directly onto the XR scene. There may be several
+      kinds of buffers for a single view; for example a pixel buffer and a depth
+      buffer.
 
       The surface-local coordinates for surfaces with a composite buffer
       attached are defined from (-1, -1) to (1, 1), and correspond to X and Y
@@ -149,7 +151,13 @@
 
     <enum name="error">
       <entry name="invalid_buffer" value="0"
-        summary="client attempted to attach a 3D buffer to this composite buffer" />
+        summary="client attempted to attach an invalid buffer or buffer type" />
+    </enum>
+
+    <enum name="buffer_type">
+      <entry name="pixel_buffer" value="0" summary="A buffer of pixels" />
+      <entry name="depth_buffer" value="1"
+        summary="A buffer where each 'pixel' represents a depth value" />
     </enum>
 
     <request name="attach_buffer">
@@ -157,12 +165,16 @@
         Attaches or updates a 2D buffer which has been prepared for a specific
         XR view. The buffer may be set to null to clear the buffer for this
         view, which is used mainly when the compositor has sent the
-        zxr_view_v1.finished event for that view.
+        zxr_view_v1.finished event for that view. If you set the buffer twice
+        for the same view and buffer type, the buffer for that view/type will be
+        updated.
       </description>
       <arg name="view" type="object" interface="zxr_view_v1"
         summary="view this buffer is prepared for" />
       <arg name="buffer" type="object" interface="wl_buffer" allow-null="true"
         summary="2D buffer to attach for this view" />
+      <arg name="buffer_type" type="uint" enum="buffer_type"
+        summary="buffer_type for this buffer" />
     </request>
 
     <request name="get_wl_buffer">
