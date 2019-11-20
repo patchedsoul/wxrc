@@ -396,13 +396,19 @@ static void render_cursor(struct wxrc_server *server,
 
 void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 		mat4 view_matrix, mat4 projection_matrix) {
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+
 	glClearColor(bg_color[0], bg_color[1], bg_color[2], bg_color[3]);
-	glClear(GL_COLOR_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	mat4 vp_matrix = GLM_MAT4_IDENTITY_INIT;
 	glm_mat4_mul(projection_matrix, view_matrix, vp_matrix);
 
 	render_grid(&server->gl, vp_matrix);
+
+	glDepthFunc(GL_ALWAYS);
 
 	struct wxrc_view *wxrc_view;
 	wl_list_for_each_reverse(wxrc_view, &server->views, link) {
@@ -415,6 +421,8 @@ void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 	if (server->seat->pointer_state.focused_surface != NULL) {
 		render_cursor(server, &server->gl, vp_matrix, server->cursor.matrix);
 	}
+
+	glDepthFunc(GL_LESS);
 }
 
 void wxrc_gl_render_xr_view(struct wxrc_server *server, struct wxrc_xr_view *view,
@@ -425,8 +433,6 @@ void wxrc_gl_render_xr_view(struct wxrc_server *server, struct wxrc_xr_view *vie
 	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 
 	glViewport(0, 0, width, height);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
 		image, 0);

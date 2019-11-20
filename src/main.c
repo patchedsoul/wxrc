@@ -1,4 +1,5 @@
 #define _POSIX_C_SOURCE 200112L
+#include <assert.h>
 #include <EGL/egl.h>
 #include <GLES2/gl2.h>
 #include <openxr/openxr.h>
@@ -349,6 +350,22 @@ static void xr_view_update_mvp_matricies(
 	}
 }
 
+struct wlr_renderer *create_renderer(struct wlr_egl *egl, EGLenum platform,
+		void *remote_display, EGLint *config_attribs, EGLint visual_id) {
+	EGLint wxrc_attribs[64];
+	size_t i;
+	for (i = 0; config_attribs[i] != EGL_NONE; i++) {
+		wxrc_attribs[i] = config_attribs[i];
+	}
+	wxrc_attribs[i++] = EGL_DEPTH_SIZE;
+	wxrc_attribs[i++] = 24;
+	wxrc_attribs[i++] = EGL_NONE;
+	assert(i < sizeof(wxrc_attribs) / sizeof(wxrc_attribs[0]));
+
+	return wlr_renderer_autocreate(egl, platform, remote_display,
+		wxrc_attribs, visual_id);
+}
+
 int main(int argc, char *argv[]) {
 	struct wxrc_server server = {0};
 
@@ -385,7 +402,7 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	server.backend = wlr_backend_autocreate(server.wl_display, NULL);
+	server.backend = wlr_backend_autocreate(server.wl_display, create_renderer);
 	if (server.backend == NULL) {
 		wlr_log(WLR_ERROR, "Failed to create native backend");
 		return 1;
