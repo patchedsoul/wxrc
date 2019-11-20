@@ -22,7 +22,7 @@ void wxrc_gl_finish(struct wxrc_gl *gl);
 void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 	mat4 view_matrix, mat4 projection_matrix);
 void wxrc_gl_render_xr_view(struct wxrc_server *server, struct wxrc_xr_view *view,
-	XrView *xr_view, GLuint framebuffer, GLuint image);
+	XrView *xr_view, GLuint framebuffer, GLuint image, GLuint depth_buffer);
 
 void wxrc_get_projection_matrix(XrView *xr_view, mat4 projection_matrix);
 

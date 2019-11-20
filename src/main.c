@@ -63,7 +63,8 @@ static XrResult wxrc_xr_view_push_frame(struct wxrc_xr_view *view,
 		view->config.recommendedImageRectHeight;
 
 	wxrc_gl_render_xr_view(server, view, xr_view,
-		view->framebuffers[buffer_index], view->images[buffer_index].image);
+		view->framebuffers[buffer_index], view->images[buffer_index].image,
+		view->depth_buffer);
 	glFinish();
 
 	r = xrReleaseSwapchainImage(view->swapchain, NULL);

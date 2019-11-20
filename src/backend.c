@@ -465,6 +465,13 @@ static struct wxrc_xr_view *wxrc_xr_create_swapchains(XrSession session,
 		}
 
 		glGenFramebuffers(view->nimages, view->framebuffers);
+
+		glGenTextures(1, &view->depth_buffer);
+		glBindTexture(GL_TEXTURE_2D, view->depth_buffer);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT,
+			view->config.recommendedImageRectWidth,
+			view->config.recommendedImageRectHeight,
+			0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, 0);
 	}
 
 	return views;
@@ -512,6 +519,16 @@ static bool backend_start(struct wlr_backend *wlr_backend) {
 	assert(!backend->started);
 
 	wlr_log(WLR_DEBUG, "Starting wlroots XR backend");
+
+	const char *gl_exts = (const char *)glGetString(GL_EXTENSIONS);
+	if (gl_exts == NULL) {
+		wlr_log(WLR_ERROR, "Failed to get GL extensions");
+		return false;
+	}
+	if (strstr(gl_exts, "GL_OES_depth_texture") == NULL) {
+		wlr_log(WLR_ERROR, "GL_OES_depth_texture not supported");
+		return false;
+	}
 
 	XrViewConfigurationView *view_configs = wxrc_xr_enumerate_stereo_config_views(
 		backend->instance, backend->sysid, &backend->nviews);

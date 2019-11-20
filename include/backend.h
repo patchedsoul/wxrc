@@ -16,6 +16,7 @@ struct wxrc_xr_view {
 	uint32_t nimages;
 	XrSwapchainImageOpenGLESKHR *images;
 	GLuint *framebuffers;
+	GLuint depth_buffer;
 
 	struct wxrc_zxr_view_v1 *wl_view;
 };

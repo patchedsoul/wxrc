@@ -426,7 +426,7 @@ void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 }
 
 void wxrc_gl_render_xr_view(struct wxrc_server *server, struct wxrc_xr_view *view,
-		XrView *xr_view, GLuint framebuffer, GLuint image) {
+		XrView *xr_view, GLuint framebuffer, GLuint image, GLuint depth_buffer) {
 	uint32_t width = view->config.recommendedImageRectWidth;
 	uint32_t height = view->config.recommendedImageRectHeight;
 
@@ -436,6 +436,8 @@ void wxrc_gl_render_xr_view(struct wxrc_server *server, struct wxrc_xr_view *vie
 
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
 		image, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D,
+		depth_buffer, 0);
 
 	mat4 view_matrix;
 	wxrc_xr_view_get_matrix(xr_view, view_matrix);
