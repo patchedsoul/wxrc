@@ -97,31 +97,41 @@ static const GLchar gltf_vertex_shader_src[] =
 	"\n"
 	"attribute vec3 pos;\n"
 	"attribute vec3 normal;\n"
+	"attribute vec2 texcoord;\n"
 	"uniform mat4 mvp;\n"
 	"\n"
 	"varying vec3 vertex_pos;\n"
 	"varying vec3 vertex_normal;\n"
+	"varying vec2 vertex_texcoord;\n"
 	"\n"
 	"void main() {\n"
 	"	gl_Position = mvp * vec4(pos, 1.0);\n"
 	"	vertex_pos = pos;\n"
 	"	vertex_normal = normalize(mat3(mvp) * normal);\n"
+	"	vertex_texcoord = texcoord;\n"
 	"}\n";
 
 static const GLchar gltf_fragment_shader_src[] =
 	"#version 100\n"
 	"precision mediump float;\n"
 	"\n"
+	"uniform bool use_tex;\n"
 	"uniform vec4 base_color;\n"
+	"uniform sampler2D tex;\n"
 	"\n"
 	"varying vec3 vertex_pos;\n"
 	"varying vec3 vertex_normal;\n"
+	"varying vec2 vertex_texcoord;\n"
 	"\n"
 	"void main() {\n"
 	"	vec3 light_pos = vec3(3.0, 10.0, -5.0);\n"
 	"	vec3 light_color = vec3(1.0);\n"
 	"	float lum = max(dot(vertex_normal, normalize(light_pos)), 0.0);\n"
-	"	gl_FragColor = base_color * vec4((0.3 + 0.7 * lum) * light_color, 1.0);\n"
+	"	vec4 color = base_color;\n"
+	"	if (use_tex) {\n"
+	"		color = texture2D(tex, vertex_texcoord);\n"
+	"	}\n"
+	"	gl_FragColor = color * vec4((0.3 + 0.7 * lum) * light_color, 1.0);\n"
 	"}\n";
 
 static GLuint wxrc_gl_compile_shader(GLuint type, const GLchar *src) {
@@ -474,7 +484,8 @@ void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 
 	mat4 model_matrix = GLM_MAT4_IDENTITY_INIT;
 	glm_translate(model_matrix, (vec3){ 0.0, 0.0, -3.0 });
-	glm_rotate_y(model_matrix, 0.4, model_matrix);
+	glm_rotate_y(model_matrix, -0.4, model_matrix);
+	//glm_scale(model_matrix, (vec3){ 0.01, 0.01, 0.01 });
 
 	mat4 mvp_matrix;
 	glm_mat4_mul(vp_matrix, model_matrix, mvp_matrix);

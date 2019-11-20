@@ -3,11 +3,13 @@
 
 #include <cglm/cglm.h>
 #include <cgltf.h>
+#include <GLES2/gl2.h>
 #include <stdbool.h>
 
 struct wxrc_gltf_model {
 	struct wxrc_gl *gl;
 	cgltf_data *data;
+	GLuint *textures;
 };
 
 bool wxrc_gltf_model_init(struct wxrc_gltf_model *model, struct wxrc_gl *gl,

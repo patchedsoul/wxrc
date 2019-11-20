@@ -39,6 +39,7 @@ cgltf = dependency('cgltf', fallback: ['cgltf', 'cgltf'])
 egl = dependency('egl')
 gbm = dependency('gbm')
 glesv2 = dependency('glesv2')
+libpng = dependency('libpng')
 openxr = dependency('openxr')
 xkbcommon = dependency('xkbcommon')
 wayland_client = dependency('wayland-client')
@@ -82,6 +83,7 @@ executable('wxrc',
 		cgltf,
 		egl,
 		glesv2,
+		libpng,
 		openxr,
 		wlroots,
 		xkbcommon,
