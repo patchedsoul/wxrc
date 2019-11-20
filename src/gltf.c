@@ -99,7 +99,7 @@ static bool enable_accessor(cgltf_accessor *accessor, GLint loc) {
 		array_type = GL_FLOAT;
 		break;
 	default:
-		wlr_log(WLR_DEBUG, "invalid buffer view type");
+		wlr_log(WLR_ERROR, "invalid buffer view type");
 		return false;
 	}
 
@@ -122,21 +122,21 @@ static bool enable_accessor(cgltf_accessor *accessor, GLint loc) {
 static void render_primitive(cgltf_primitive *primitive) {
 	cgltf_attribute *pos_attr = get_primitive_attribute(primitive, "POSITION");
 	if (pos_attr == NULL) {
-		wlr_log(WLR_DEBUG, "primitive missing POSITION attribute");
+		wlr_log(WLR_ERROR, "primitive missing POSITION attribute");
 		return;
 	}
 	if (pos_attr->type != cgltf_attribute_type_position) {
-		wlr_log(WLR_DEBUG, "POSITION attribute has invalid type");
+		wlr_log(WLR_ERROR, "POSITION attribute has invalid type");
 		return;
 	}
 
 	cgltf_attribute *normal_attr = get_primitive_attribute(primitive, "NORMAL");
 	if (normal_attr == NULL) {
-		wlr_log(WLR_DEBUG, "primitive missing NORMAL attribute");
+		wlr_log(WLR_ERROR, "primitive missing NORMAL attribute");
 		return;
 	}
 	if (normal_attr->type != cgltf_attribute_type_normal) {
-		wlr_log(WLR_DEBUG, "NORMAL attribute has invalid type");
+		wlr_log(WLR_ERROR, "NORMAL attribute has invalid type");
 		return;
 	}
 
@@ -168,10 +168,21 @@ static void render_primitive(cgltf_primitive *primitive) {
 		return;
 	}
 
+	cgltf_material *material = primitive->material;
+	if (!material->has_pbr_metallic_roughness) {
+		wlr_log(WLR_ERROR, "unsupported material");
+		return;
+	}
+
 	GLint program;
 	glGetIntegerv(GL_CURRENT_PROGRAM, &program);
 	GLint pos_loc = glGetAttribLocation(program, "pos");
 	GLint normal_loc = glGetAttribLocation(program, "normal");
+	GLint base_color_loc = glGetUniformLocation(program, "base_color");
+
+	glUniform4fv(base_color_loc, 1,
+		primitive->material->pbr_metallic_roughness.base_color_factor);
+
 	if (!enable_accessor(pos_attr->data, pos_loc) ||
 			!enable_accessor(normal_attr->data, normal_loc)) {
 		return;

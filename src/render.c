@@ -112,6 +112,8 @@ static const GLchar gltf_fragment_shader_src[] =
 	"#version 100\n"
 	"precision mediump float;\n"
 	"\n"
+	"uniform vec4 base_color;\n"
+	"\n"
 	"varying vec3 vertex_pos;\n"
 	"varying vec3 vertex_normal;\n"
 	"\n"
@@ -119,7 +121,6 @@ static const GLchar gltf_fragment_shader_src[] =
 	"	vec3 light_pos = vec3(3.0, 10.0, -5.0);\n"
 	"	vec3 light_color = vec3(1.0);\n"
 	"	float lum = max(dot(vertex_normal, normalize(light_pos)), 0.0);\n"
-	"	vec4 base_color = vec4(1.0, 0.0, 0.0, 1.0);\n"
 	"	gl_FragColor = base_color * vec4((0.3 + 0.7 * lum) * light_color, 1.0);\n"
 	"}\n";
 
