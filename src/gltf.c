@@ -144,6 +144,8 @@ bool wxrc_gltf_model_init(struct wxrc_gltf_model *model, struct wxrc_gl *gl,
 }
 
 void wxrc_gltf_model_finish(struct wxrc_gltf_model *model) {
+	glDeleteTextures(model->data->textures_count, model->textures);
+	free(model->textures);
 	cgltf_free(model->data);
 }
 
