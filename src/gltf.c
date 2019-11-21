@@ -5,30 +5,6 @@
 #include "gltf.h"
 #include "render.h"
 
-static bool bind_mesh(cgltf_mesh *mesh) {
-	printf("mesh: %s\n", mesh->name);
-	for (size_t i = 0; i < mesh->primitives_count; i++) {
-		cgltf_primitive *primitive = &mesh->primitives[i];
-		for (size_t j = 0; j < primitive->attributes_count; j++) {
-			cgltf_attribute *attrib = &primitive->attributes[j];
-			printf("attribute: %s\n", attrib->name);
-			// TODO
-		}
-	}
-	return true;
-}
-
-static bool bind_node(cgltf_node *node) {
-	printf("node: %s\n", node->name);
-	if (node->mesh != NULL) {
-		bind_mesh(node->mesh);
-	}
-	for (size_t i = 0; i < node->children_count; i++) {
-		bind_node(node->children[i]);
-	}
-	return true;
-}
-
 static GLuint bind_texture(cgltf_texture *texture) {
 	cgltf_image *image = texture->image;
 	cgltf_buffer_view *buffer_view = image->buffer_view;
@@ -106,11 +82,6 @@ static GLuint bind_texture(cgltf_texture *texture) {
 }
 
 static bool bind_model(struct wxrc_gltf_model *model) {
-	cgltf_scene *scene = model->data->scene;
-	for (size_t i = 0; i < scene->nodes_count; i++) {
-		bind_node(scene->nodes[i]);
-	}
-
 	model->textures = calloc(model->data->textures_count, sizeof(GLuint));
 	for (size_t i = 0; i < model->data->textures_count; i++) {
 		model->textures[i] = bind_texture(&model->data->textures[i]);
