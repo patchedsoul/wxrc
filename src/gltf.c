@@ -214,6 +214,10 @@ static void bind_buffer_view(struct wxrc_gltf_model *model,
 	glBindBuffer(buffer_view_type_target(buffer_view->type), vbo);
 }
 
+static void unbind_buffer_view(cgltf_buffer_view *buffer_view) {
+	glBindBuffer(buffer_view_type_target(buffer_view->type), 0);
+}
+
 static bool enable_vertex_accessor(struct wxrc_gltf_model *model,
 		cgltf_accessor *accessor, GLint loc) {
 	cgltf_buffer_view *buffer_view = accessor->buffer_view;
@@ -236,6 +240,8 @@ static bool enable_vertex_accessor(struct wxrc_gltf_model *model,
 	glEnableVertexAttribArray(loc);
 	glVertexAttribPointer(loc, num_components, array_type,
 		accessor->normalized, buffer_view->stride, (GLvoid *)offset);
+
+	unbind_buffer_view(buffer_view);
 
 	return true;
 }
@@ -347,6 +353,8 @@ static void render_primitive(struct wxrc_gltf_model *model,
 		GLenum type = component_type(indices->component_type);
 		GLintptr offset = indices->offset;
 		glDrawElements(mode, indices->count, type, (GLvoid *)offset);
+
+		unbind_buffer_view(indices->buffer_view);
 	} else {
 		glDrawArrays(mode, 0, pos_attr->data->count);
 	}
@@ -356,6 +364,7 @@ static void render_primitive(struct wxrc_gltf_model *model,
 	if (use_tex) {
 		glDisableVertexAttribArray(texcoord_loc);
 	}
+	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 static void render_mesh(struct wxrc_gltf_model *model, cgltf_mesh *mesh) {
