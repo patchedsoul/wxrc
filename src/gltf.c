@@ -353,6 +353,9 @@ static void render_primitive(struct wxrc_gltf_model *model,
 
 	glDisableVertexAttribArray(pos_loc);
 	glDisableVertexAttribArray(normal_loc);
+	if (use_tex) {
+		glDisableVertexAttribArray(texcoord_loc);
+	}
 }
 
 static void render_mesh(struct wxrc_gltf_model *model, cgltf_mesh *mesh) {
