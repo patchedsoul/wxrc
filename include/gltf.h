@@ -9,6 +9,7 @@
 struct wxrc_gltf_model {
 	struct wxrc_gl *gl;
 	cgltf_data *data;
+	GLuint *vbos; // one per buffer view
 	GLuint *textures;
 };
 

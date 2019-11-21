@@ -6,7 +6,44 @@
 #include "gltf.h"
 #include "render.h"
 
-static GLuint bind_texture(cgltf_texture *texture) {
+static GLenum buffer_view_type_target(cgltf_buffer_view_type t) {
+	switch (t) {
+	case cgltf_buffer_view_type_invalid:
+		break;
+	case cgltf_buffer_view_type_indices:
+		return GL_ELEMENT_ARRAY_BUFFER;
+	case cgltf_buffer_view_type_vertices:
+		return GL_ARRAY_BUFFER;
+	}
+	wlr_log(WLR_ERROR, "Invalid buffer view type");
+	return GL_NONE;
+}
+
+static GLuint upload_buffer_view(cgltf_buffer_view *buffer_view) {
+	cgltf_buffer *buffer = buffer_view->buffer;
+	if (buffer->data == NULL) {
+		wlr_log(WLR_ERROR, "buffer data unavailable");
+		return 0;
+	}
+
+	GLenum target = buffer_view_type_target(buffer_view->type);
+	if (target == GL_NONE) {
+		return 0;
+	}
+
+	assert(buffer_view->offset + buffer_view->size <= buffer->size);
+	void *data = (uint8_t *)buffer->data + buffer_view->offset;
+
+	GLuint vbo = 0;
+	glGenBuffers(1, &vbo);
+	glBindBuffer(target, vbo);
+	glBufferData(target, buffer_view->size, data, GL_STATIC_DRAW);
+	glBindBuffer(target, 0);
+
+	return vbo;
+}
+
+static GLuint upload_texture(cgltf_texture *texture) {
 	cgltf_image *image = texture->image;
 	cgltf_buffer_view *buffer_view = image->buffer_view;
 	cgltf_buffer *buffer = buffer_view->buffer;
@@ -69,7 +106,7 @@ static GLuint bind_texture(cgltf_texture *texture) {
 	wlr_log(WLR_DEBUG, "Uploading texture: %s (%dx%d, %dB)", texture->name,
 		width, height, row_bytes * height);
 
-	GLuint tex;
+	GLuint tex = 0;
 	glGenTextures(1, &tex);
 
 	glBindTexture(GL_TEXTURE_2D, tex);
@@ -82,10 +119,22 @@ static GLuint bind_texture(cgltf_texture *texture) {
 	return tex;
 }
 
-static bool bind_model(struct wxrc_gltf_model *model) {
+static bool upload_model(struct wxrc_gltf_model *model) {
+	model->vbos = calloc(model->data->buffer_views_count, sizeof(GLuint));
+	for (size_t i = 0; i < model->data->buffer_views_count; i++) {
+		if (model->data->buffer_views[i].type ==
+				cgltf_buffer_view_type_invalid) {
+			continue;
+		}
+		model->vbos[i] = upload_buffer_view(&model->data->buffer_views[i]);
+		if (model->vbos[i] == 0) {
+			return false;
+		}
+	}
+
 	model->textures = calloc(model->data->textures_count, sizeof(GLuint));
 	for (size_t i = 0; i < model->data->textures_count; i++) {
-		model->textures[i] = bind_texture(&model->data->textures[i]);
+		model->textures[i] = upload_texture(&model->data->textures[i]);
 		if (model->textures[i] == 0) {
 			return false;
 		}
@@ -111,7 +160,7 @@ bool wxrc_gltf_model_init(struct wxrc_gltf_model *model, struct wxrc_gl *gl,
 		return false;
 	}
 
-	if (!bind_model(model)) {
+	if (!upload_model(model)) {
 		return false;
 	}
 
@@ -120,6 +169,7 @@ bool wxrc_gltf_model_init(struct wxrc_gltf_model *model, struct wxrc_gl *gl,
 
 void wxrc_gltf_model_finish(struct wxrc_gltf_model *model) {
 	glDeleteTextures(model->data->textures_count, model->textures);
+	glDeleteBuffers(model->data->buffer_views_count, model->vbos);
 	free(model->textures);
 	cgltf_free(model->data);
 }
@@ -156,15 +206,18 @@ static GLenum component_type(cgltf_component_type t) {
 	return GL_NONE;
 }
 
-static void *accessor_data(cgltf_accessor *accessor) {
-	cgltf_buffer_view *buffer_view = accessor->buffer_view;
-	size_t offset = buffer_view->offset + accessor->offset;
-	assert(offset < buffer_view->buffer->size);
-	return (uint8_t *)buffer_view->buffer->data + offset;
+static void bind_buffer_view(struct wxrc_gltf_model *model,
+		cgltf_buffer_view *buffer_view) {
+	size_t buffer_view_idx = buffer_view - model->data->buffer_views;
+	GLuint vbo = model->vbos[buffer_view_idx];
+	assert(vbo != 0);
+	glBindBuffer(buffer_view_type_target(buffer_view->type), vbo);
 }
 
-static bool enable_accessor(cgltf_accessor *accessor, GLint loc) {
+static bool enable_vertex_accessor(struct wxrc_gltf_model *model,
+		cgltf_accessor *accessor, GLint loc) {
 	cgltf_buffer_view *buffer_view = accessor->buffer_view;
+	assert(buffer_view->type == cgltf_buffer_view_type_vertices);
 
 	GLenum array_type = component_type(accessor->component_type);
 	if (array_type == GL_NONE) {
@@ -176,12 +229,13 @@ static bool enable_accessor(cgltf_accessor *accessor, GLint loc) {
 		return false;
 	}
 
-	size_t num_components = cgltf_num_components(accessor->type);
-	void *data = accessor_data(accessor);
+	bind_buffer_view(model, buffer_view);
 
-	glVertexAttribPointer(loc, num_components, array_type,
-		accessor->normalized, buffer_view->stride, data);
+	size_t num_components = cgltf_num_components(accessor->type);
+	GLintptr offset = accessor->offset;
 	glEnableVertexAttribArray(loc);
+	glVertexAttribPointer(loc, num_components, array_type,
+		accessor->normalized, buffer_view->stride, (GLvoid *)offset);
 
 	return true;
 }
@@ -252,8 +306,8 @@ static void render_primitive(struct wxrc_gltf_model *model,
 	GLint base_color_loc = glGetUniformLocation(program, "base_color");
 	GLint tex_loc = glGetUniformLocation(program, "tex");
 
-	if (!enable_accessor(pos_attr->data, pos_loc) ||
-			!enable_accessor(normal_attr->data, normal_loc)) {
+	if (!enable_vertex_accessor(model, pos_attr->data, pos_loc) ||
+			!enable_vertex_accessor(model, normal_attr->data, normal_loc)) {
 		return;
 	}
 
@@ -273,7 +327,7 @@ static void render_primitive(struct wxrc_gltf_model *model,
 			wlr_log(WLR_ERROR, "TEXCOORD_0 attribute has invalid type");
 			return;
 		}
-		if (!enable_accessor(texcoord_attr->data, texcoord_loc)) {
+		if (!enable_vertex_accessor(model, texcoord_attr->data, texcoord_loc)) {
 			return;
 		}
 		size_t tex_idx = pbr_metallic_roughness->base_color_texture.texture -
@@ -285,16 +339,14 @@ static void render_primitive(struct wxrc_gltf_model *model,
 		glUniform1i(tex_loc, 0);
 	}
 
-	if (primitive->indices != NULL) {
-		if (primitive->indices->buffer_view->buffer !=
-				pos_attr->data->buffer_view->buffer) {
-			// TODO
-			wlr_log(WLR_ERROR, "indices buffer is different from POSITION's");
-			return;
-		}
-		glDrawElements(mode, primitive->indices->count,
-			component_type(primitive->indices->component_type),
-			accessor_data(primitive->indices));
+	cgltf_accessor *indices = primitive->indices;
+	if (indices != NULL) {
+		assert(indices->buffer_view->type == cgltf_buffer_view_type_indices);
+		bind_buffer_view(model, indices->buffer_view);
+
+		GLenum type = component_type(indices->component_type);
+		GLintptr offset = indices->offset;
+		glDrawElements(mode, indices->count, type, (GLvoid *)offset);
 	} else {
 		glDrawArrays(mode, 0, pos_attr->data->count);
 	}
