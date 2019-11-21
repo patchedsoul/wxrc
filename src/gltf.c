@@ -303,7 +303,13 @@ static void render_primitive(struct wxrc_gltf_model *model,
 		glUniform1i(tex_loc, 0);
 	}
 
-	glDrawArrays(mode, 0, pos_attr->data->count);
+	if (primitive->indices != NULL) {
+		// TODO
+		wlr_log(WLR_ERROR, "primitives with indices not yet supported");
+		return;
+	} else {
+		glDrawArrays(mode, 0, pos_attr->data->count);
+	}
 
 	glDisableVertexAttribArray(pos_loc);
 	glDisableVertexAttribArray(normal_loc);
