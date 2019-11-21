@@ -292,7 +292,7 @@ static void render_primitive(struct wxrc_gltf_model *model,
 			wlr_log(WLR_ERROR, "indices buffer is different from POSITION's");
 			return;
 		}
-		glDrawElements(mode, pos_attr->data->count,
+		glDrawElements(mode, primitive->indices->count,
 			component_type(primitive->indices->component_type),
 			accessor_data(primitive->indices));
 	} else {
