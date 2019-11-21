@@ -85,6 +85,9 @@ static bool bind_model(struct wxrc_gltf_model *model) {
 	model->textures = calloc(model->data->textures_count, sizeof(GLuint));
 	for (size_t i = 0; i < model->data->textures_count; i++) {
 		model->textures[i] = bind_texture(&model->data->textures[i]);
+		if (model->textures[i] == 0) {
+			return false;
+		}
 	}
 
 	return true;
