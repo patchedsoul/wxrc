@@ -1,4 +1,5 @@
 #define _POSIX_C_SOURCE 200809L
+#include <assert.h>
 #include <png.h>
 #include <stdio.h>
 #include <wlr/util/log.h>
@@ -134,31 +135,39 @@ static cgltf_attribute *get_primitive_attribute(cgltf_primitive *primitive,
 	return NULL;
 }
 
+static GLenum component_type(cgltf_component_type t) {
+	switch (t) {
+	case cgltf_component_type_invalid:
+		break;
+	case cgltf_component_type_r_8:
+		return GL_BYTE;
+	case cgltf_component_type_r_8u:
+		return GL_UNSIGNED_BYTE;
+	case cgltf_component_type_r_16:
+		return GL_SHORT;
+	case cgltf_component_type_r_16u:
+		return GL_UNSIGNED_SHORT;
+	case cgltf_component_type_r_32u:
+		return GL_UNSIGNED_INT;
+	case cgltf_component_type_r_32f:
+		return GL_FLOAT;
+	}
+	wlr_log(WLR_ERROR, "invalid component type");
+	return GL_NONE;
+}
+
+static void *accessor_data(cgltf_accessor *accessor) {
+	cgltf_buffer_view *buffer_view = accessor->buffer_view;
+	size_t offset = buffer_view->offset + accessor->offset;
+	assert(offset < buffer_view->buffer->size);
+	return (uint8_t *)buffer_view->buffer->data + offset;
+}
+
 static bool enable_accessor(cgltf_accessor *accessor, GLint loc) {
 	cgltf_buffer_view *buffer_view = accessor->buffer_view;
 
-	GLenum array_type;
-	switch (accessor->component_type) {
-	case cgltf_component_type_r_8:
-		array_type = GL_BYTE;
-		break;
-	case cgltf_component_type_r_8u:
-		array_type = GL_UNSIGNED_BYTE;
-		break;
-	case cgltf_component_type_r_16:
-		array_type = GL_SHORT;
-		break;
-	case cgltf_component_type_r_16u:
-		array_type = GL_UNSIGNED_SHORT;
-		break;
-	case cgltf_component_type_r_32u:
-		array_type = GL_UNSIGNED_INT;
-		break;
-	case cgltf_component_type_r_32f:
-		array_type = GL_FLOAT;
-		break;
-	default:
-		wlr_log(WLR_ERROR, "invalid buffer view type");
+	GLenum array_type = component_type(accessor->component_type);
+	if (array_type == GL_NONE) {
 		return false;
 	}
 
@@ -168,8 +177,7 @@ static bool enable_accessor(cgltf_accessor *accessor, GLint loc) {
 	}
 
 	size_t num_components = cgltf_num_components(accessor->type);
-	size_t offset = buffer_view->offset + accessor->offset;
-	void *data = (uint8_t *)buffer_view->buffer->data + offset;
+	void *data = accessor_data(accessor);
 
 	glVertexAttribPointer(loc, num_components, array_type,
 		accessor->normalized, buffer_view->stride, data);
@@ -278,9 +286,15 @@ static void render_primitive(struct wxrc_gltf_model *model,
 	}
 
 	if (primitive->indices != NULL) {
-		// TODO
-		wlr_log(WLR_ERROR, "primitives with indices not yet supported");
-		return;
+		if (primitive->indices->buffer_view->buffer !=
+				pos_attr->data->buffer_view->buffer) {
+			// TODO
+			wlr_log(WLR_ERROR, "indices buffer is different from POSITION's");
+			return;
+		}
+		glDrawElements(mode, pos_attr->data->count,
+			component_type(primitive->indices->component_type),
+			accessor_data(primitive->indices));
 	} else {
 		glDrawArrays(mode, 0, pos_attr->data->count);
 	}
