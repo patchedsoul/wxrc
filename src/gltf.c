@@ -48,11 +48,6 @@ static GLuint upload_buffer_view(cgltf_buffer_view *buffer_view) {
 static GLuint upload_texture(struct wxrc_gltf_model *model,
 		cgltf_texture *texture) {
 	cgltf_image *image = texture->image;
-	if (image->mime_type != NULL &&
-			strcmp(image->mime_type, "image/png") != 0) {
-		wlr_log(WLR_ERROR, "Image MIME type unsupported: %s", image->mime_type);
-		return 0;
-	}
 
 	FILE *f;
 	cgltf_buffer_view *buffer_view = image->buffer_view;
