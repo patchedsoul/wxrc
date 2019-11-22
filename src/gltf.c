@@ -8,6 +8,36 @@
 #include "img.h"
 #include "render.h"
 
+static bool infer_buffer_view_type(cgltf_buffer_view *buffer_view,
+		cgltf_buffer_view_type type) {
+	if (buffer_view->type == cgltf_buffer_view_type_invalid) {
+		buffer_view->type = type;
+	} else if (buffer_view->type != type) {
+		wlr_log(WLR_ERROR, "Invalid buffer view type: got %d, want %d",
+			buffer_view->type, type);
+		return false;
+	}
+	return true;
+}
+
+static bool infer_primitive_buffer_views_type(cgltf_primitive *primitive) {
+	if (primitive->indices != NULL && !infer_buffer_view_type(
+			primitive->indices->buffer_view, cgltf_buffer_view_type_indices)) {
+		return false;
+	}
+
+	for (size_t i = 0; i < primitive->attributes_count; i++) {
+		cgltf_attribute *attr = &primitive->attributes[i];
+
+		cgltf_buffer_view *buffer_view = attr->data->buffer_view;
+		if (!infer_buffer_view_type(buffer_view, cgltf_buffer_view_type_vertices)) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
 static GLenum buffer_view_type_target(cgltf_buffer_view_type t) {
 	switch (t) {
 	case cgltf_buffer_view_type_invalid:
@@ -99,6 +129,15 @@ static GLuint upload_texture(struct wxrc_gltf_model *model,
 }
 
 static bool upload_model(struct wxrc_gltf_model *model) {
+	for (size_t i = 0; i < model->data->meshes_count; i++) {
+		cgltf_mesh *mesh = &model->data->meshes[i];
+		for (size_t j = 0; j < mesh->primitives_count; j++) {
+			if (!infer_primitive_buffer_views_type(&mesh->primitives[j])) {
+				return false;
+			}
+		}
+	}
+
 	model->vbos = calloc(model->data->buffer_views_count, sizeof(GLuint));
 	for (size_t i = 0; i < model->data->buffer_views_count; i++) {
 		if (model->data->buffer_views[i].type ==
