@@ -85,8 +85,32 @@ static const GLchar fragment_shader_src[] =
 	"	if (n >= 2) {\n"
 	"		gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);\n"
 	"	} else {\n"
-	"		discard;\n"
+	"		gl_FragColor = vec4(0.0);\n"
 	"	}\n"
+	"}\n";
+
+static const GLchar depth_buffer_vertex_shader_src[] =
+	"#version 100\n"
+	"\n"
+	"attribute vec2 tex_coord;\n"
+	"\n"
+	"void main() {\n"
+	"	gl_Position = vec4(tex_coord, 0.0, 1.0);\n"
+	"}\n";
+
+static const GLchar depth_buffer_fragment_shader_src[] =
+	"#version 100\n"
+	"precision mediump float;\n"
+	"\n"
+	"uniform sampler2D tex;\n"
+	"\n"
+	"void main() {\n"
+	"	float zNear = 0.5;\n"
+	"	float zFar = 2000.0;\n"
+	"	float depth = texture2D(tex, gl_FragCoord.xy).x;\n"
+	"	float c = (2.0 * zNear) / (zFar + zNear - depth * (zFar - zNear));\n"
+	"	c = depth / 10.0;\n"
+	"	gl_FragColor = vec4(c, c, c, 1.0);\n"
 	"}\n";
 
 /* TODO: Don't hardcode these */
@@ -110,7 +134,6 @@ static struct wl_buffer *composite_wl_buffer;
 struct cube_buffer {
 	struct gbm_bo *bo;
 
-	int width, height;
 	int format;
 	uint64_t modifier;
 	int nplanes;
@@ -123,13 +146,21 @@ struct cube_buffer {
 
 	EGLImageKHR egl_image;
 	GLuint gl_texture;
+};
+
+struct cube_xr_buffer {
+	int width, height;
+	struct cube_buffer color, depth;
+
 	GLuint gl_fbo;
+	GLuint gl_depth_texture;
+	GLuint gl_depth_fbo;
 };
 
 struct cube_xr_view {
 	struct zxr_view_v1 *view;
 	struct zxr_surface_view_v1 *surface_view;
-	struct cube_buffer buffers[BUFFERS_PER_VIEW];
+	struct cube_xr_buffer buffers[BUFFERS_PER_VIEW];
 	mat4 mvp_matrix;
 	struct wl_list link;
 };
@@ -164,12 +195,13 @@ static struct {
 } gbm;
 
 static GLuint gl_prog;
+static GLuint gl_depth_buffer_prog;
 
 static void render(uint32_t time);
 
-static struct cube_buffer *view_next_buffer(struct cube_xr_view *view) {
+static struct cube_xr_buffer *view_next_buffer(struct cube_xr_view *view) {
 	for (int i = 0; i < BUFFERS_PER_VIEW; i++) {
-		if (!view->buffers[i].busy) {
+		if (!view->buffers[i].color.busy) {
 			return &view->buffers[i];
 		}
 	}
@@ -232,7 +264,8 @@ static GLuint compile_shader(GLuint type, const GLchar *src) {
 	return shader;
 }
 
-static GLuint compile_program(void) {
+static GLuint compile_program(const GLchar *vertex_shader_src,
+		const GLchar *fragment_shader_src) {
 	GLuint vertex_shader = compile_shader(GL_VERTEX_SHADER, vertex_shader_src);
 	if (vertex_shader == 0) {
 		fprintf(stderr, "Failed to compile vertex shader\n");
@@ -267,7 +300,7 @@ static GLuint compile_program(void) {
 
 static void render_scene(uint32_t time, mat4 mvp_matrix) {
 	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-	glClear(GL_COLOR_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	GLint pos_loc = glGetAttribLocation(gl_prog, "pos");
 	GLint mvp_loc = glGetUniformLocation(gl_prog, "mvp");
@@ -289,14 +322,54 @@ static void render_scene(uint32_t time, mat4 mvp_matrix) {
 	glUseProgram(0);
 }
 
+static void render_depth_buffer(GLuint depth_texture) {
+	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	GLint tex_coord_loc = glGetAttribLocation(gl_depth_buffer_prog, "tex_coord");
+	GLint tex_loc = glGetUniformLocation(gl_depth_buffer_prog, "tex");
+
+	glUseProgram(gl_depth_buffer_prog);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, depth_texture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glUniform1i(tex_loc, 0);
+
+	size_t npoints = 4;
+	const float points[] = {
+		-1.0, -1.0,
+		-1.0, 1.0,
+		1.0, -1.0,
+		1.0, 1.0,
+	};
+
+	GLint coords_per_point = sizeof(points) / sizeof(points[0]) / npoints;
+	glVertexAttribPointer(tex_coord_loc, coords_per_point,
+		GL_FLOAT, GL_FALSE, 0, points);
+	glEnableVertexAttribArray(tex_coord_loc);
+
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, npoints);
+
+	glDisableVertexAttribArray(tex_coord_loc);
+
+	glUseProgram(0);
+}
+
 static void render_view(struct cube_xr_view *view, uint32_t time) {
-	struct cube_buffer *buffer = view_next_buffer(view);
+	struct cube_xr_buffer *buffer = view_next_buffer(view);
 	assert(buffer);
 
-	glBindFramebuffer(GL_FRAMEBUFFER, buffer->gl_fbo);
 	glViewport(0, 0, display_width, display_height);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+	glEnable(GL_DEPTH_TEST);
+
+	// Render to color texture and write to depth buffer
+	glBindFramebuffer(GL_FRAMEBUFFER, buffer->gl_fbo);
 
 	mat4 model_matrix = GLM_MAT4_IDENTITY_INIT;
 	glm_rotate_y(model_matrix, (float)time / 1000, model_matrix);
@@ -308,9 +381,23 @@ static void render_view(struct cube_xr_view *view, uint32_t time) {
 
 	glFinish();
 
+	// Render to depth texture
+	glBindFramebuffer(GL_FRAMEBUFFER, buffer->gl_depth_fbo);
+	glDepthMask(GL_FALSE);
+
+	render_depth_buffer(buffer->gl_depth_texture);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glDepthMask(GL_TRUE);
+
+	glFinish();
+
 	zxr_composite_buffer_v1_attach_buffer(
-			composite_buffer, view->view, buffer->buffer,
-			ZXR_COMPOSITE_BUFFER_V1_BUFFER_TYPE_PIXEL_BUFFER);
+		composite_buffer, view->view, buffer->depth.buffer,
+		ZXR_COMPOSITE_BUFFER_V1_BUFFER_TYPE_PIXEL_BUFFER);
+	zxr_composite_buffer_v1_attach_buffer(
+		composite_buffer, view->view, buffer->depth.buffer,
+		ZXR_COMPOSITE_BUFFER_V1_BUFFER_TYPE_DEPTH_BUFFER);
 }
 
 static void render(uint32_t time) {
@@ -356,14 +443,11 @@ static const struct zwp_linux_buffer_params_v1_listener params_listener = {
 	.failed = linux_dmabuf_failed,
 };
 
-static void allocate_buffer(struct cube_buffer *buffer) {
-	static const uint32_t flags = ZWP_LINUX_BUFFER_PARAMS_V1_FLAGS_Y_INVERT;
-
-	/* TODO: Do not hard code this */
-	buffer->width = display_width, buffer->height = display_height;
+static void allocate_buffer(struct cube_buffer *buffer, int width, int height) {
+	uint32_t flags = ZWP_LINUX_BUFFER_PARAMS_V1_FLAGS_Y_INVERT;
 
 	buffer->format = DRM_FORMAT_ARGB8888;
-	buffer->bo = gbm_bo_create(gbm.device, buffer->width, buffer->height,
+	buffer->bo = gbm_bo_create(gbm.device, width, height,
 			buffer->format, GBM_BO_USE_RENDERING);
 	assert(buffer->bo);
 
@@ -381,18 +465,18 @@ static void allocate_buffer(struct cube_buffer *buffer) {
 		buffer->modifier >> 32, buffer->modifier & 0xFFFFFFFF);
 	zwp_linux_buffer_params_v1_add_listener(params, &params_listener, buffer);
 	zwp_linux_buffer_params_v1_create(params,
-		buffer->width, buffer->height, buffer->format, flags);
+		width, height, buffer->format, flags);
 
-	static const int general_attribs = 3;
-	static const int plane_attribs = 5;
-	static const int entries_per_attrib = 2;
+	int general_attribs = 3;
+	int plane_attribs = 5;
+	int entries_per_attrib = 2;
 	EGLint attribs[(general_attribs + plane_attribs * MAX_BUFFER_PLANES) *
 			entries_per_attrib + 1];
 	unsigned int atti = 0;
 	attribs[atti++] = EGL_WIDTH;
-	attribs[atti++] = buffer->width;
+	attribs[atti++] = width;
 	attribs[atti++] = EGL_HEIGHT;
-	attribs[atti++] = buffer->height;
+	attribs[atti++] = height;
 	attribs[atti++] = EGL_LINUX_DRM_FOURCC_EXT;
 	attribs[atti++] = buffer->format;
 	/* plane 0 */
@@ -420,11 +504,45 @@ static void allocate_buffer(struct cube_buffer *buffer) {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
 	egl.glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, buffer->egl_image);
-	glGenFramebuffers(1, &buffer->gl_fbo);
-	glBindFramebuffer(GL_FRAMEBUFFER, buffer->gl_fbo);
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+static void allocate_xr_buffer(struct cube_xr_buffer *xr_buffer) {
+	/* TODO: Do not hard code this */
+	xr_buffer->width = display_width;
+	xr_buffer->height = display_height;
+
+	allocate_buffer(&xr_buffer->color, xr_buffer->width, xr_buffer->height);
+	allocate_buffer(&xr_buffer->depth, xr_buffer->width, xr_buffer->height);
+
+	// This requires OES_depth_texture
+	glGenTextures(1, &xr_buffer->gl_depth_texture);
+	glBindTexture(GL_TEXTURE_2D, xr_buffer->gl_depth_texture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT,
+		xr_buffer->width, xr_buffer->height, 0,
+		GL_DEPTH_COMPONENT, GL_FLOAT, 0);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	glGenFramebuffers(1, &xr_buffer->gl_fbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, xr_buffer->gl_fbo);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-			buffer->gl_texture, 0);
+		xr_buffer->color.gl_texture, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D,
+		xr_buffer->gl_depth_texture, 0);
 	assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	glGenFramebuffers(1, &xr_buffer->gl_depth_fbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, xr_buffer->gl_depth_fbo);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+		xr_buffer->depth.gl_texture, 0);
+	assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 static void surface_view_handle_mvp_matrix(void *data,
@@ -485,6 +603,7 @@ int main(int argc, char *argv[]) {
 		EGL_GREEN_SIZE, 1,
 		EGL_BLUE_SIZE, 1,
 		EGL_ALPHA_SIZE, 1,
+		EGL_DEPTH_SIZE, 24,
 		EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
 		EGL_NONE,
 	};
@@ -515,7 +634,7 @@ int main(int argc, char *argv[]) {
 		zxr_surface_view_v1_add_listener(view->surface_view,
 				&surface_view_listener, view);
 		for (int i = 0; i < BUFFERS_PER_VIEW; ++i) {
-			allocate_buffer(&view->buffers[i]);
+			allocate_xr_buffer(&view->buffers[i]);
 		}
 	}
 	composite_buffer = zxr_shell_v1_create_composite_buffer(xr_shell);
@@ -526,9 +645,16 @@ int main(int argc, char *argv[]) {
 
 	eglSwapInterval(egl.display, 0);
 
-	gl_prog = compile_program();
+	gl_prog = compile_program(vertex_shader_src, fragment_shader_src);
 	if (gl_prog == 0) {
 		fprintf(stderr, "Failed to compile shader program\n");
+		return 1;
+	}
+
+	gl_depth_buffer_prog = compile_program(
+		depth_buffer_vertex_shader_src, depth_buffer_fragment_shader_src);
+	if (gl_depth_buffer_prog == 0) {
+		fprintf(stderr, "Failed to compile depth buffer shader program\n");
 		return 1;
 	}
 
