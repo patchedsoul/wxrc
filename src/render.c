@@ -408,7 +408,9 @@ void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 
 	render_grid(&server->gl, vp_matrix);
 
-	glDepthFunc(GL_ALWAYS);
+	// Disable writing to the depth buffer, so that we never render views
+	// intersected but still correctly integrate them in the 3D scene
+	glDepthMask(GL_FALSE);
 
 	struct wxrc_view *wxrc_view;
 	wl_list_for_each_reverse(wxrc_view, &server->views, link) {
@@ -422,7 +424,7 @@ void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 		render_cursor(server, &server->gl, vp_matrix, server->cursor.matrix);
 	}
 
-	glDepthFunc(GL_LESS);
+	glDepthMask(GL_TRUE);
 }
 
 void wxrc_gl_render_xr_view(struct wxrc_server *server, struct wxrc_xr_view *view,
