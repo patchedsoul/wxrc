@@ -41,7 +41,7 @@ static const GLchar grid_fragment_shader_src[] =
 	"		a = min(a, 1.0);\n"
 	"		gl_FragColor = mix(fg_color, vec4(0), a);\n"
 	"	} else {\n"
-	"		gl_FragColor = vec4(0);\n"
+	"		discard;\n"
 	"	}\n"
 	"}\n";
 
