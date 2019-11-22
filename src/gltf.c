@@ -369,7 +369,7 @@ static void render_node(struct wxrc_gltf_model *model, cgltf_node *node,
 	mat4 node_matrix;
 	glm_mat4_copy(matrix, node_matrix);
 	if (node->has_matrix) {
-		mat4 m;
+		mat4 m; // needs to be aligned
 		assert(sizeof(m) == sizeof(node->matrix));
 		memcpy(m, node->matrix, sizeof(m));
 		glm_mat4_mul(node_matrix, m, node_matrix);
@@ -378,8 +378,12 @@ static void render_node(struct wxrc_gltf_model *model, cgltf_node *node,
 			glm_translate(node_matrix, node->translation);
 		}
 		if (node->has_rotation) {
+			versor q; // needs to be aligned
+			assert(sizeof(q) == sizeof(node->rotation));
+			memcpy(q, node->rotation, sizeof(q));
+
 			mat4 rot;
-			glm_quat_mat4(node->rotation, rot);
+			glm_quat_mat4(q, rot);
 			glm_mat4_mul(node_matrix, rot, node_matrix);
 		}
 		if (node->has_scale) {
