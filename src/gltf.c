@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include <assert.h>
+#include <libgen.h>
 #include <png.h>
 #include <stdio.h>
 #include <wlr/util/log.h>
@@ -43,19 +44,42 @@ static GLuint upload_buffer_view(cgltf_buffer_view *buffer_view) {
 	return vbo;
 }
 
-static GLuint upload_texture(cgltf_texture *texture) {
+static GLuint upload_texture(struct wxrc_gltf_model *model,
+		cgltf_texture *texture) {
 	cgltf_image *image = texture->image;
-	cgltf_buffer_view *buffer_view = image->buffer_view;
-	cgltf_buffer *buffer = buffer_view->buffer;
-
-	uint8_t *buf_data = (uint8_t *)buffer->data + buffer_view->offset;
-
-	if (png_sig_cmp(buf_data, 0, buffer_view->size)) {
-		wlr_log(WLR_ERROR, "Malformed PNG file");
+	if (image->mime_type != NULL &&
+			strcmp(image->mime_type, "image/png") != 0) {
+		wlr_log(WLR_ERROR, "Image MIME type unsupported: %s", image->mime_type);
 		return 0;
 	}
 
-	FILE *f = fmemopen(buf_data, buffer_view->size, "r");
+	FILE *f;
+	cgltf_buffer_view *buffer_view = image->buffer_view;
+	if (buffer_view != NULL) {
+		cgltf_buffer *buffer = buffer_view->buffer;
+
+		uint8_t *buf_data = (uint8_t *)buffer->data + buffer_view->offset;
+
+		if (png_sig_cmp(buf_data, 0, buffer_view->size)) {
+			wlr_log(WLR_ERROR, "Malformed PNG file");
+			return 0;
+		}
+
+		f = fmemopen(buf_data, buffer_view->size, "r");
+	} else if (image->uri != NULL) {
+		char *model_path = strdup(model->path);
+		char *dir = dirname(model_path);
+		char image_path[PATH_MAX];
+		snprintf(image_path, sizeof(image_path), "%s/%s", dir, image->uri);
+		free(model_path);
+
+		f = fopen(image_path, "r");
+	}
+
+	if (f == NULL) {
+		wlr_log(WLR_ERROR, "Failed to open image");
+		return 0;
+	}
 
 	png_structp png =
 		png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
@@ -134,7 +158,7 @@ static bool upload_model(struct wxrc_gltf_model *model) {
 
 	model->textures = calloc(model->data->textures_count, sizeof(GLuint));
 	for (size_t i = 0; i < model->data->textures_count; i++) {
-		model->textures[i] = upload_texture(&model->data->textures[i]);
+		model->textures[i] = upload_texture(model, &model->data->textures[i]);
 		if (model->textures[i] == 0) {
 			return false;
 		}
@@ -146,6 +170,7 @@ static bool upload_model(struct wxrc_gltf_model *model) {
 bool wxrc_gltf_model_init(struct wxrc_gltf_model *model, struct wxrc_gl *gl,
 		const char *path) {
 	model->gl = gl;
+	model->path = strdup(path);
 
 	cgltf_options options = {0};
 	cgltf_result result =
@@ -172,6 +197,7 @@ void wxrc_gltf_model_finish(struct wxrc_gltf_model *model) {
 	glDeleteBuffers(model->data->buffer_views_count, model->vbos);
 	free(model->textures);
 	cgltf_free(model->data);
+	free(model->path);
 }
 
 static cgltf_attribute *get_primitive_attribute(cgltf_primitive *primitive,
