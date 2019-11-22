@@ -464,6 +464,16 @@ void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 
 	render_grid(&server->gl, vp_matrix);
 
+	mat4 model_matrix = GLM_MAT4_IDENTITY_INIT;
+	glm_translate(model_matrix, (vec3){ 0.0, -1.0, -3.0 });
+	glm_rotate_y(model_matrix, -0.4, model_matrix);
+	glm_scale(model_matrix, (vec3){ 1.0, 1.0, 1.0 });
+
+	mat4 mvp_matrix;
+	glm_mat4_mul(vp_matrix, model_matrix, mvp_matrix);
+
+	wxrc_gltf_model_render(&server->gl.model, mvp_matrix);
+
 	// Disable writing to the depth buffer, so that we never render views
 	// intersected but still correctly integrate them in the 3D scene
 	glDepthMask(GL_FALSE);
@@ -481,16 +491,6 @@ void wxrc_gl_render_view(struct wxrc_server *server, struct wxrc_xr_view *view,
 	}
 
 	glDepthMask(GL_TRUE);
-
-	mat4 model_matrix = GLM_MAT4_IDENTITY_INIT;
-	glm_translate(model_matrix, (vec3){ 0.0, 0.0, -3.0 });
-	glm_rotate_y(model_matrix, -0.4, model_matrix);
-	//glm_scale(model_matrix, (vec3){ 0.01, 0.01, 0.01 });
-
-	mat4 mvp_matrix;
-	glm_mat4_mul(vp_matrix, model_matrix, mvp_matrix);
-
-	wxrc_gltf_model_render(&server->gl.model, mvp_matrix);
 }
 
 void wxrc_gl_render_xr_view(struct wxrc_server *server, struct wxrc_xr_view *view,
