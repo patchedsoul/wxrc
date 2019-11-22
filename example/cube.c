@@ -85,7 +85,7 @@ static const GLchar fragment_shader_src[] =
 	"	if (n >= 2) {\n"
 	"		gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);\n"
 	"	} else {\n"
-	"		gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);\n"
+	"		discard;\n"
 	"	}\n"
 	"}\n";
 
