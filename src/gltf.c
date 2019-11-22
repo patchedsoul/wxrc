@@ -91,8 +91,10 @@ static GLuint upload_texture(struct wxrc_gltf_model *model,
 	GLuint tex = 0;
 	glGenTextures(1, &tex);
 
+	GLenum format = has_alpha ? GL_RGBA : GL_RGB;
 	glBindTexture(GL_TEXTURE_2D, tex);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA,
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format,
 		GL_UNSIGNED_BYTE, data);
 	glBindTexture(GL_TEXTURE_2D, 0);
 

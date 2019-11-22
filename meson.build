@@ -39,6 +39,7 @@ cgltf = dependency('cgltf', fallback: ['cgltf', 'cgltf'])
 egl = dependency('egl')
 gbm = dependency('gbm')
 glesv2 = dependency('glesv2')
+libjpeg = dependency('libjpeg')
 libpng = dependency('libpng')
 openxr = dependency('openxr')
 xkbcommon = dependency('xkbcommon')
@@ -84,6 +85,7 @@ executable('wxrc',
 		cgltf,
 		egl,
 		glesv2,
+		libjpeg,
 		libpng,
 		openxr,
 		wlroots,

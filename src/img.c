@@ -1,31 +1,14 @@
+#include <stddef.h>
+#include <stdio.h>
+#include <jpeglib.h>
 #include <png.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <wlr/util/log.h>
 #include "img.h"
 
-void *wxrc_load_image(FILE *f, const char *mime_type,
-		int *width_ptr, int *height_ptr, bool *has_alpha_ptr) {
-	if (mime_type != NULL && strcmp(mime_type, "image/png") != 0) {
-		wlr_log(WLR_ERROR, "Image MIME type unsupported: %s", mime_type);
-		return NULL;
-	}
-
-	uint8_t header[8];
-	if (fread(header, 1, sizeof(header), f) != sizeof(header)) {
-		wlr_log(WLR_ERROR, "Failed to read image header");
-		return NULL;
-	}
-	if (fseek(f, -sizeof(header), SEEK_CUR) != 0) {
-		wlr_log_errno(WLR_ERROR, "fseek failed");
-		return NULL;
-	}
-
-	if (png_sig_cmp(header, 0, sizeof(header))) {
-		wlr_log(WLR_ERROR, "Malformed PNG file");
-		return NULL;
-	}
-
+static void *load_png_image(FILE *f, int *width_ptr, int *height_ptr,
+		bool *has_alpha_ptr) {
 	png_structp png =
 		png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
 	png_infop info = png_create_info_struct(png);
@@ -74,4 +57,71 @@ void *wxrc_load_image(FILE *f, const char *mime_type,
 	*height_ptr = height;
 	*has_alpha_ptr = true;
 	return data;
+}
+
+static bool is_jpeg_header(uint8_t buf[static 3]) {
+	return buf[0] == 0xFF && buf[1] == 0xD8 && buf[2] == 0xFF;
+}
+
+static void *load_jpeg_image(FILE *f, int *width_ptr, int *height_ptr,
+		bool *has_alpha_ptr) {
+	struct jpeg_error_mgr err = {0};
+	struct jpeg_decompress_struct info = {
+		.err = jpeg_std_error(&err),
+	};
+	jpeg_create_decompress(&info);
+
+	jpeg_stdio_src(&info, f);
+	jpeg_read_header(&info, TRUE);
+
+	jpeg_start_decompress(&info);
+
+	size_t data_size =
+		info.output_width * info.output_height * info.num_components;
+	uint8_t *data = malloc(data_size);
+	while (info.output_scanline < info.output_height) {
+		uint8_t *row = data + info.num_components * info.output_width *
+			info.output_scanline;
+		jpeg_read_scanlines(&info, &row, 1);
+	}
+
+	jpeg_finish_decompress(&info);
+
+	*width_ptr = info.output_width;
+	*height_ptr = info.output_width;
+	*has_alpha_ptr = info.num_components == 4;
+	return data;
+}
+
+void *wxrc_load_image(FILE *f, const char *mime_type,
+		int *width_ptr, int *height_ptr, bool *has_alpha_ptr) {
+	if (mime_type == NULL) {
+		uint8_t header[8];
+		if (fread(header, 1, sizeof(header), f) != sizeof(header)) {
+			wlr_log(WLR_ERROR, "Failed to read image header");
+			return NULL;
+		}
+		if (fseek(f, -sizeof(header), SEEK_CUR) != 0) {
+			wlr_log_errno(WLR_ERROR, "fseek failed");
+			return NULL;
+		}
+
+		if (png_sig_cmp(header, 0, sizeof(header)) == 0) {
+			mime_type = "image/png";
+		} else if (is_jpeg_header(header)) {
+			mime_type = "image/jpeg";
+		} else {
+			wlr_log(WLR_ERROR, "Unsupported image format");
+			return NULL;
+		}
+	}
+
+	if (strcmp(mime_type, "image/png") == 0) {
+		return load_png_image(f, width_ptr, height_ptr, has_alpha_ptr);
+	} else if (strcmp(mime_type, "image/jpeg") == 0) {
+		return load_jpeg_image(f, width_ptr, height_ptr, has_alpha_ptr);
+	} else {
+		wlr_log(WLR_ERROR, "Image MIME type unsupported: %s", mime_type);
+		return NULL;
+	}
 }
