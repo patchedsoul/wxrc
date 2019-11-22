@@ -1,10 +1,11 @@
 #define _POSIX_C_SOURCE 200809L
 #include <assert.h>
 #include <libgen.h>
-#include <png.h>
+#include <limits.h>
 #include <stdio.h>
 #include <wlr/util/log.h>
 #include "gltf.h"
+#include "img.h"
 #include "render.h"
 
 static GLenum buffer_view_type_target(cgltf_buffer_view_type t) {
@@ -57,14 +58,7 @@ static GLuint upload_texture(struct wxrc_gltf_model *model,
 	cgltf_buffer_view *buffer_view = image->buffer_view;
 	if (buffer_view != NULL) {
 		cgltf_buffer *buffer = buffer_view->buffer;
-
 		uint8_t *buf_data = (uint8_t *)buffer->data + buffer_view->offset;
-
-		if (png_sig_cmp(buf_data, 0, buffer_view->size)) {
-			wlr_log(WLR_ERROR, "Malformed PNG file");
-			return 0;
-		}
-
 		f = fmemopen(buf_data, buffer_view->size, "r");
 	} else if (image->uri != NULL) {
 		char *model_path = strdup(model->path);
@@ -81,54 +75,18 @@ static GLuint upload_texture(struct wxrc_gltf_model *model,
 		return 0;
 	}
 
-	png_structp png =
-		png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-	png_infop info = png_create_info_struct(png);
-	png_init_io(png, f);
-
-	png_read_info(png, info);
-	int width = png_get_image_width(png, info);
-	int height = png_get_image_height(png, info);
-	int color_type = png_get_color_type(png, info);
-	int bit_depth = png_get_bit_depth(png, info);
-
-	if (bit_depth == 16) {
-		png_set_strip_16(png);
+	int width, height;
+	bool has_alpha;
+	void *data =
+		wxrc_load_image(f, image->mime_type, &width, &height, &has_alpha);
+	if (data == NULL) {
+		return 0;
 	}
-	if (color_type == PNG_COLOR_TYPE_PALETTE) {
-		png_set_palette_to_rgb(png);
-	}
-	if (color_type == PNG_COLOR_TYPE_GRAY && bit_depth < 8) {
-		png_set_expand_gray_1_2_4_to_8(png);
-	}
-	if (png_get_valid(png, info, PNG_INFO_tRNS)) {
-		png_set_tRNS_to_alpha(png);
-	}
-	if (color_type == PNG_COLOR_TYPE_RGB ||
-			color_type == PNG_COLOR_TYPE_GRAY ||
-			color_type == PNG_COLOR_TYPE_PALETTE) {
-		png_set_filler(png, 0xFF, PNG_FILLER_AFTER);
-	}
-	if (color_type == PNG_COLOR_TYPE_GRAY ||
-			color_type == PNG_COLOR_TYPE_GRAY_ALPHA) {
-		png_set_gray_to_rgb(png);
-	}
-
-	int row_bytes = width * 4;
-	uint8_t *data = malloc(row_bytes * height);
-	png_bytep *row_pointers = malloc(height * sizeof(png_bytep));
-	for (int i = 0; i < height; i++) {
-		row_pointers[i] = data + row_bytes * i;
-	}
-	png_read_image(png, row_pointers);
-	free(row_pointers);
-
-	png_destroy_read_struct(&png, &info, NULL);
 
 	fclose(f);
 
-	wlr_log(WLR_DEBUG, "Uploading texture: %s (%dx%d, %dB)", texture->name,
-		width, height, row_bytes * height);
+	wlr_log(WLR_DEBUG, "Uploading texture: %s (%dx%d)", texture->name,
+		width, height);
 
 	GLuint tex = 0;
 	glGenTextures(1, &tex);

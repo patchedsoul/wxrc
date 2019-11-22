@@ -68,6 +68,7 @@ executable('wxrc',
 	files(
 		'src/backend.c',
 		'src/gltf.c',
+		'src/img.c',
 		'src/input.c',
 		'src/main.c',
 		'src/mathutil.c',
