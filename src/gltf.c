@@ -393,33 +393,56 @@ static void render_primitive(struct wxrc_gltf_model *model,
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-static void render_mesh(struct wxrc_gltf_model *model, cgltf_mesh *mesh) {
+static void render_mesh(struct wxrc_gltf_model *model, cgltf_mesh *mesh,
+		mat4 matrix) {
+	GLuint prog = model->gl->gltf_program;
+	GLint mvp_loc = glGetUniformLocation(prog, "mvp");
+	glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, (GLfloat *)matrix);
+
 	for (size_t i = 0; i < mesh->primitives_count; i++) {
 		render_primitive(model, &mesh->primitives[i]);
 	}
 }
 
-static void render_node(struct wxrc_gltf_model *model, cgltf_node *node) {
+static void render_node(struct wxrc_gltf_model *model, cgltf_node *node,
+		mat4 matrix) {
+	mat4 node_matrix;
+	glm_mat4_copy(matrix, node_matrix);
+	if (node->has_matrix) {
+		mat4 m;
+		assert(sizeof(m) == sizeof(node->matrix));
+		memcpy(m, node->matrix, sizeof(m));
+		glm_mat4_mul(node_matrix, m, node_matrix);
+	} else {
+		if (node->has_translation) {
+			glm_translate(node_matrix, node->translation);
+		}
+		if (node->has_rotation) {
+			mat4 rot;
+			glm_quat_mat4(node->rotation, rot);
+			glm_mat4_mul(node_matrix, rot, node_matrix);
+		}
+		if (node->has_scale) {
+			glm_scale(node_matrix, node->scale);
+		}
+	}
+
 	if (node->mesh != NULL) {
-		render_mesh(model, node->mesh);
+		render_mesh(model, node->mesh, node_matrix);
 	}
 	for (size_t i = 0; i < node->children_count; i++) {
-		render_node(model, node->children[i]);
+		render_node(model, node->children[i], node_matrix);
 	}
 }
 
-void wxrc_gltf_model_render(struct wxrc_gltf_model *model, mat4 mvp_matrix) {
+void wxrc_gltf_model_render(struct wxrc_gltf_model *model, mat4 matrix) {
 	GLuint prog = model->gl->gltf_program;
-
-	GLint mvp_loc = glGetUniformLocation(prog, "mvp");
 
 	glUseProgram(prog);
 
-	glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, (GLfloat *)mvp_matrix);
-
 	cgltf_scene *scene = model->data->scene;
 	for (size_t i = 0; i < scene->nodes_count; i++) {
-		render_node(model, scene->nodes[i]);
+		render_node(model, scene->nodes[i], matrix);
 	}
 
 	glUseProgram(0);
